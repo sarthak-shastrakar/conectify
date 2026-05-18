@@ -1,0 +1,125 @@
+/* Preview Page Container */
+.Preview-Container {
+  min-height: 100vh;
+  padding: 3rem 2rem;
+  background: linear-gradient(135deg, #e0f7fa, #ffffff);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+@media (prefers-color-scheme: dark) {
+  .Preview-Container {
+    background: linear-gradient(135deg, #121212, #1c1c1c);
+  }
+
+  .Header h2, .subText, .btn-connect {
+    color: #fff;
+  }
+
+  .btn-connect {
+    background-color: #03dac6;
+  }
+
+  .btn-connect:hover {
+    background-color: #00bfa5;
+  }
+}
+
+/* Header Text */
+.Header {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.Header h2 {
+  font-size: 2rem;
+  font-weight: bold;
+  color: #004d40;
+}
+
+.subText {
+  font-size: 1rem;
+  color: #555;
+  margin-top: 0.5rem;
+}
+
+/* Username Section */
+.Username-Text {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 2rem;
+  width: 100%;
+  max-width: 500px;
+}
+
+.Username-Text .MuiTextField-root {
+  background-color: #fff;
+  border-radius: 8px;
+  flex: 1;
+}
+
+.btn-connect {
+  background-color: #00796b;
+  color: #fff;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-align: center;
+}
+
+.btn-connect:hover {
+  background-color: #004d40;
+  transform: translateY(-2px);
+}
+
+/* Camera Preview */
+.Video-Camera-Preview {
+  max-width: 600px;
+  width: 100%;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 1rem;
+  border-radius: 16px;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(8px);
+  margin-top: 2rem;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.Video-Camera-Preview video {
+  width: 100%;
+  border-radius: 12px;
+  object-fit: cover;
+  border: 2px solid transparent;
+  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.15);
+}
+
+/* Optional glow for active preview */
+.Video-Camera-Preview video.active {
+  border: 2px solid #00bfa5;
+  animation: pulseGlow 2s infinite;
+}
+
+.Username-tag{
+  text-align: center;
+}
+
+@keyframes pulseGlow {
+  0% {
+    box-shadow: 0 0 0 0 rgba(0, 191, 165, 0.4);
+  }
+  70% {
+    box-shadow: 0 0 0 12px rgba(0, 191, 165, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(0, 191, 165, 0);
+  }
+}
