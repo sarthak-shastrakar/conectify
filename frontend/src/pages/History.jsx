@@ -271,23 +271,10 @@ export default function History() {
   };
 
   return (
-    <Box sx={{ display: 'flex', minHeight: '100vh', background: theme.palette.background.default }}>
+    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', background: theme.palette.background.default }}>
       <AppSidebar />
 
-      {/* Mobile AppBar */}
-      <AppBar position="fixed" elevation={0}
-        sx={{ display: { md: 'none' }, background: isDark ? 'rgba(5,8,16,0.9)' : 'rgba(255,255,255,0.9)', backdropFilter: 'blur(20px)', borderBottom: `1px solid ${theme.palette.divider}`, color: 'text.primary' }}
-      >
-        <Toolbar sx={{ justifyContent: 'space-between' }}>
-          <Stack direction="row" alignItems="center" spacing={1}>
-            <Typography sx={{ fontSize: '20px', color: theme.palette.primary.light }}>⬡</Typography>
-            <GradientText variant="h6" sx={{ fontSize: '1.1rem', fontWeight: 700 }}>History</GradientText>
-          </Stack>
-          <ThemeToggle />
-        </Toolbar>
-      </AppBar>
-
-      <Box component="main" sx={{ flex: 1, p: { xs: 2, sm: 4, md: 5 }, overflowY: 'auto', pt: { xs: 10, md: 5 }, pb: { xs: 10, md: 5 } }}>
+      <Box component="main" sx={{ flex: 1, p: { xs: 2, sm: 4, md: 5 }, overflowY: 'auto', pt: { xs: 12, md: 14 }, pb: { xs: 5, md: 5 } }}>
         <Box sx={{ maxWidth: '1000px', mx: 'auto', width: '100%', animation: 'fadeInUp 0.5s ease both' }}>
           
           {/* Header */}
@@ -336,14 +323,6 @@ export default function History() {
         </Box>
       </Box>
 
-      {/* Mobile bottom nav */}
-      <BottomNavigation value={1} onChange={(_, v) => navigate(['/home', '/history', '/profile'][v])} showLabels
-        sx={{ display: { md: 'none' }, position: 'fixed', bottom: 0, left: 0, right: 0, background: isDark ? 'rgba(5,8,16,0.92)' : 'rgba(255,255,255,0.92)', backdropFilter: 'blur(20px)', borderTop: `1px solid ${theme.palette.divider}`, zIndex: 1200, height: 64, '& .MuiBottomNavigationAction-root': { color: 'text.secondary', '&.Mui-selected': { color: theme.palette.primary.main } } }}
-      >
-        <BottomNavigationAction label="Home" icon={<HomeIcon />} />
-        <BottomNavigationAction label="History" icon={<HistoryIcon />} />
-        <BottomNavigationAction label="Profile" icon={<PersonIcon />} />
-      </BottomNavigation>
     </Box>
   );
 }

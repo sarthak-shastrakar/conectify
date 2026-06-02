@@ -63,8 +63,9 @@ export const connectToSocket = (server) => {
             }
 
             // Emit to all in room
+            const joiningUserName = socketUserMap[socket.id]?.name || socketUserMap[socket.id]?.username || "Someone";
             for (let a = 0; a < connections[path].length; a++) {
-                io.to(connections[path][a]).emit("user-joined", socket.id, connections[path]);
+                io.to(connections[path][a]).emit("user-joined", socket.id, connections[path], joiningUserName);
             }
 
             // Send stored messages
@@ -103,6 +104,73 @@ export const connectToSocket = (server) => {
             }
         });
 
+        socket.on("edit-chat-message", (index, newData) => {
+            const [matchingRoom, found] = Object.entries(connections).reduce(
+                ([room, isFound], [roomKey, roomValue]) => {
+                    if (!isFound && roomValue.includes(socket.id)) return [roomKey, true];
+                    return [room, isFound];
+                },
+                ["", false]
+            );
+
+            if (found === true && messages[matchingRoom] !== undefined) {
+                const msg = messages[matchingRoom][index];
+                // Only allow editing if the message exists and was sent by this socket
+                if (msg && msg["socket-id-sender"] === socket.id) {
+                    msg.data = newData;
+                    console.log("message edited in", matchingRoom, "at index", index, ":", newData);
+                    connections[matchingRoom].forEach((elem) => {
+                        io.to(elem).emit("edit-chat-message", index, newData);
+                    });
+                }
+            }
+        });
+
+        socket.on("emoji-reaction", (emoji, sender) => {
+            const [matchingRoom, found] = Object.entries(connections).reduce(
+                ([room, isFound], [roomKey, roomValue]) => {
+                    if (!isFound && roomValue.includes(socket.id)) return [roomKey, true];
+                    return [room, isFound];
+                },
+                ["", false]
+            );
+            if (found) {
+                connections[matchingRoom].forEach((elem) => {
+                    io.to(elem).emit("emoji-reaction", emoji, sender, socket.id);
+                });
+            }
+        });
+
+        socket.on("raise-hand", (sender) => {
+            const [matchingRoom, found] = Object.entries(connections).reduce(
+                ([room, isFound], [roomKey, roomValue]) => {
+                    if (!isFound && roomValue.includes(socket.id)) return [roomKey, true];
+                    return [room, isFound];
+                },
+                ["", false]
+            );
+            if (found) {
+                connections[matchingRoom].forEach((elem) => {
+                    io.to(elem).emit("raise-hand", socket.id, sender);
+                });
+            }
+        });
+
+        socket.on("lower-hand", () => {
+            const [matchingRoom, found] = Object.entries(connections).reduce(
+                ([room, isFound], [roomKey, roomValue]) => {
+                    if (!isFound && roomValue.includes(socket.id)) return [roomKey, true];
+                    return [room, isFound];
+                },
+                ["", false]
+            );
+            if (found) {
+                connections[matchingRoom].forEach((elem) => {
+                    io.to(elem).emit("lower-hand", socket.id);
+                });
+            }
+        });
+
         socket.on("disconnect", async () => {
             let key;
 
@@ -112,8 +180,9 @@ export const connectToSocket = (server) => {
                         key = k;
 
                         // Notify everyone left
+                        const leavingUserName = socketUserMap[socket.id]?.name || socketUserMap[socket.id]?.username || "Someone";
                         for (let a = 0; a < connections[key].length; ++a) {
-                            io.to(connections[key][a]).emit("user-left", socket.id);
+                            io.to(connections[key][a]).emit("user-left", socket.id, leavingUserName);
                         }
 
                         // Remove socket from room

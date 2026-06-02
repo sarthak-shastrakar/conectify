@@ -48,6 +48,10 @@ const userSchema = new Schema(
     // Token stored as a random hex for session identification (legacy approach).
     // This is NOT a JWT — it's a random session token stored in DB.
     token: { type: String },
+
+    // ─── Password Reset OTP ───────────────────────────────────────────────────
+    resetPasswordCode: { type: String, default: null },
+    resetPasswordExpires: { type: Date, default: null },
   },
   { timestamps: true }
 );

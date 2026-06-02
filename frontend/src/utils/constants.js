@@ -1,0 +1,15 @@
+export const API_ROUTES = {
+  LOGIN: '/login',
+  REGISTER: '/register',
+  PROFILE: '/profile',
+  GOOGLE_AUTH: '/auth/google',
+  ADD_ACTIVITY: '/add_to_activity',
+  GET_ACTIVITY: '/get_all_activity',
+  DELETE_ACTIVITY: '/delete_from_activity',
+  UPLOAD_AVATAR: '/upload_avatar',
+  LOGOUT: '/logout',
+  FORGOT_PASSWORD: '/forgot-password',
+  VERIFY_RESET_CODE: '/verify-reset-code',
+  RESET_PASSWORD: '/reset-password',
+  CHATBOT: '/chatbot',
+};

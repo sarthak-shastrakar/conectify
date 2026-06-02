@@ -2,11 +2,12 @@ import httpStatus from "http-status";
 import { User } from "../models/user.model.js";
 import bcrypt from "bcrypt";
 import crypto from "crypto";
+import axios from "axios";
 import { Meeting } from "../models/meeting.model.js";
 import { body, validationResult } from "express-validator";
-
+import { sendVerificationEmail } from "../utils/mail.js";
 // ─── Validation rule chains (used in routes) ─────────────────────────────────
-export const registerValidation = [
+const registerValidation = [
   body("name")
     .trim()
     .notEmpty().withMessage("Name is required")
@@ -28,10 +29,22 @@ export const registerValidation = [
   body("password")
     .isLength({ min: 8, max: 128 }).withMessage("Password must be 8–128 characters"),
 ];
+const loginValidation = [
+  body("email").trim().notEmpty().withMessage("Email is required").isEmail().withMessage("Valid email required").normalizeEmail(),
+  body("password").isLength({ min: 8, max: 128 }).withMessage("Password must be 8–128 characters"),
+];
+const forgotPasswordValidation = [
+  body("email").trim().notEmpty().withMessage("Email is required").isEmail().withMessage("Valid email required").normalizeEmail(),
+];
 
-export const loginValidation = [
-  body("email").trim().notEmpty().withMessage("Email is required").isEmail().withMessage("Valid email required"),
-  body("password").notEmpty().withMessage("Password is required"),
+const verifyResetCodeValidation = [
+  body("email").trim().notEmpty().withMessage("Email is required").isEmail().withMessage("Valid email required").normalizeEmail(),
+  body("code").trim().notEmpty().withMessage("Code is required").isLength({ min: 6, max: 6 }).withMessage("Code must be 6 digits"),
+];
+
+const resetPasswordValidation = [
+  body("email").trim().notEmpty().withMessage("Email is required").isEmail().withMessage("Valid email required").normalizeEmail(),
+  body("password").isLength({ min: 8, max: 128 }).withMessage("Password must be 8–128 characters"),
 ];
 
 // ─── Helper: extract validation errors ───────────────────────────────────────
@@ -166,7 +179,7 @@ const getProfile = async (req, res) => {
 
   try {
     // .select("-password") is explicit — toJSON also strips it as defence-in-depth
-    const user = await User.findOne({ token }).select("-password -__v");
+    const user = await User.findOne({ token }).select("-password -__v").lean();
     if (!user) {
       return res.status(httpStatus.UNAUTHORIZED).json({ message: "Invalid token" });
     }
@@ -246,4 +259,134 @@ const uploadAvatar = async (req, res) => {
   }
 };
 
-export { login, register, getUserHistory, addToHistory, getProfile, logout, deleteFromHistory, uploadAvatar };
+// ─── Forgot Password ───────────────────────────────────────────────────────
+const forgotPassword = async (req, res) => {
+  if (!validate(req, res)) return;
+
+  const { email } = req.body;
+  try {
+    const user = await User.findOne({ email }).lean();
+    if (!user) {
+      return res.status(httpStatus.NOT_FOUND).json({ message: "User not found" });
+    }
+    return res.status(httpStatus.OK).json({ message: "Email verified. Please set your new password." });
+  } catch (e) {
+    return res.status(500).json({ message: "Failed to process forgot password" });
+  }
+};
+
+// ─── Verify Reset Code ───────────────────────────────────────────────────────
+const verifyResetCode = async (req, res) => {
+  if (!validate(req, res)) return;
+
+  const { email, code } = req.body;
+  try {
+    const user = await User.findOne({ email }).lean();
+    if (!user || user.resetPasswordCode !== code) {
+      return res.status(httpStatus.BAD_REQUEST).json({ message: "Invalid code" });
+    }
+    if (user.resetPasswordExpires && user.resetPasswordExpires < new Date()) {
+      return res.status(httpStatus.BAD_REQUEST).json({ message: "Code expired" });
+    }
+    return res.status(httpStatus.OK).json({ message: "Code verified" });
+  } catch (e) {
+    return res.status(500).json({ message: "Failed to verify code" });
+  }
+};
+
+// ─── Reset Password ───────────────────────────────────────────────────────
+const resetPassword = async (req, res) => {
+  if (!validate(req, res)) return;
+
+  const { email, password } = req.body;
+  try {
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(httpStatus.NOT_FOUND).json({ message: "User not found" });
+    }
+    const hashedPassword = await bcrypt.hash(password, 12);
+    user.password = hashedPassword;
+    user.resetPasswordCode = null;
+    user.resetPasswordExpires = null;
+    await user.save();
+    return res.status(httpStatus.OK).json({ message: "Password reset successful" });
+  } catch (e) {
+    return res.status(500).json({ message: "Failed to reset password" });
+  }
+};
+
+const chatWithAI = async (req, res) => {
+  const { message, chatHistory } = req.body;
+
+  if (!message) {
+    return res.status(400).json({ message: "Message is required" });
+  }
+
+  try {
+    const apiKey = process.env.OPENROUTER_API_KEY;
+    if (!apiKey) {
+      return res.status(500).json({ message: "OpenRouter API Key is missing on the server" });
+    }
+
+    const messages = [];
+    // Only send the last 4 messages to dramatically reduce input token overhead
+    const shortHistory = chatHistory && Array.isArray(chatHistory) ? chatHistory.slice(-4) : [];
+
+    shortHistory.forEach(msg => {
+      messages.push({
+        role: msg.sender === 'AI' ? 'assistant' : 'user',
+        content: msg.text
+      });
+    });
+    messages.push({ role: 'user', content: message });
+
+    const response = await axios.post(
+      "https://openrouter.ai/api/v1/chat/completions",
+      {
+        model: "openrouter/free",
+        messages: [
+          { 
+            role: "system", 
+            content: "You are Conectify Bot. Assist with video calls, general help, or tech issues. Be extremely brief; answer in 1-2 short sentences max. Reject NSFW/harmful." 
+          },
+          ...messages
+        ],
+        max_tokens: 75 // Strict limit on completion token usage
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+          "HTTP-Referer": "http://localhost:3000",
+          "X-Title": "Conectify AI"
+        }
+      }
+    );
+
+    const reply = response.data?.choices?.[0]?.message?.content || "Sorry, I couldn't process that.";
+    return res.status(200).json({ reply });
+  } catch (error) {
+    console.error("OpenRouter Error:", error.response?.data || error.message);
+    return res.status(500).json({ message: "Failed to connect to AI server" });
+  }
+};
+
+export {
+  login,
+  register,
+  getUserHistory,
+  addToHistory,
+  getProfile,
+  logout,
+  deleteFromHistory,
+  uploadAvatar,
+  forgotPassword,
+  verifyResetCode,
+  resetPassword,
+  chatWithAI,
+  registerValidation,
+  loginValidation,
+  forgotPasswordValidation,
+  verifyResetCodeValidation,
+  resetPasswordValidation,
+};

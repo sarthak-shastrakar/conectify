@@ -13,6 +13,13 @@ import {
   uploadAvatar,
   registerValidation,
   loginValidation,
+  forgotPasswordValidation,
+  verifyResetCodeValidation,
+  resetPasswordValidation,
+  forgotPassword,
+  verifyResetCode,
+  resetPassword,
+  chatWithAI,
 } from "../controllers/user.controller.js";
 
 const router = Router();
@@ -68,6 +75,9 @@ const authLimiter = rateLimit({
 // ─── Auth routes — rate-limited + validated ───────────────────────────────────
 router.route("/login").post(authLimiter, loginValidation, login);
 router.route("/register").post(authLimiter, registerValidation, register);
+router.route("/forgot-password").post(authLimiter, forgotPasswordValidation, forgotPassword);
+router.route("/verify-reset-code").post(authLimiter, verifyResetCodeValidation, verifyResetCode);
+router.route("/reset-password").post(authLimiter, resetPasswordValidation, resetPassword);
 
 // ─── Protected routes — no auth middleware yet (token-in-body legacy system) ──
 // TODO: migrate to Bearer token + protect middleware when frontend is updated
@@ -77,5 +87,6 @@ router.route("/delete_from_activity").delete(deleteFromHistory);
 router.route("/profile").get(getProfile);
 router.route("/logout").post(logout);
 router.route("/upload_avatar").post(uploadAvatar);
+router.route("/chatbot").post(chatWithAI);
 
 export default router;
