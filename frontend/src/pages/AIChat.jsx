@@ -6,31 +6,30 @@ import Grid from '@mui/material/Grid';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Avatar from '@mui/material/Avatar';
-import Chip from '@mui/material/Chip';
 import CircularProgress from '@mui/material/CircularProgress';
 import IconButton from '@mui/material/IconButton';
+import Drawer from '@mui/material/Drawer';
 import SmartToyIcon from '@mui/icons-material/SmartToy';
 import SendIcon from '@mui/icons-material/Send';
-import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
-import SecurityIcon from '@mui/icons-material/Security';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import ChatIcon from '@mui/icons-material/Chat';
 import EditIcon from '@mui/icons-material/Edit';
 import CheckIcon from '@mui/icons-material/Check';
 import SearchIcon from '@mui/icons-material/Search';
+import MenuIcon from '@mui/icons-material/Menu';
 import DeleteSweepIcon from '@mui/icons-material/DeleteSweep';
 import InputAdornment from '@mui/material/InputAdornment';
 import Divider from '@mui/material/Divider';
 import { useTheme } from '@mui/material/styles';
+import { motion, AnimatePresence } from 'framer-motion';
 import { AuthContext } from '../contexts/AuthContext';
 import AppSidebar from './Navbar';
 import GlassCard from '../components/ui/GlassCard';
 import withAuth from '../utils/withAuth';
 import api from '../utils/api';
 import { API_ROUTES } from '../utils/constants';
-
 
 function AIChat() {
   const theme = useTheme();
@@ -40,6 +39,7 @@ function AIChat() {
 
   const [chatQuery, setChatQuery] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   // ChatGPT-style Chat Sessions state loaded from localStorage
   const [sessions, setSessions] = useState(() => {
@@ -81,6 +81,15 @@ function AIChat() {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatHistory, aiLoading]);
 
+  const handleDrawerToggle = () => {
+    setMobileOpen(!mobileOpen);
+  };
+
+  const selectSession = (id) => {
+    setActiveSessionId(id);
+    setMobileOpen(false); // Close drawer on mobile selection
+  };
+
   const handleSendChatMessage = async () => {
     if (!chatQuery.trim()) return;
     const userMsg = { sender: 'User', text: chatQuery };
@@ -100,7 +109,7 @@ function AIChat() {
     try {
       const res = await api.post(API_ROUTES.CHATBOT, {
         message: currentQuery,
-        chatHistory: [...chatHistory, userMsg]
+        chatHistory: chatHistory
       });
       const aiReply = { sender: 'AI', text: res.data.reply };
 
@@ -141,6 +150,7 @@ function AIChat() {
     setSessions(prev => [newSess, ...prev]);
     setActiveSessionId(newSessId);
     setSearchQuery(''); // clear search filter on new chat
+    setMobileOpen(false); // Close drawer on mobile
   };
 
   const handleDeleteSession = (idToDelete, e) => {
@@ -182,6 +192,7 @@ function AIChat() {
         }
       ]);
       setActiveSessionId(freshId);
+      setMobileOpen(false);
     }
   };
 
@@ -264,241 +275,281 @@ function AIChat() {
     return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
   };
 
-  const handleQuickPrompt = (promptText) => {
-    setChatQuery(promptText);
-  };
+  // Render Sidebar content for reusability on mobile/desktop
+  const renderSidebarContent = () => (
+    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', gap: 2.5 }}>
+      {/* New Chat Button Launcher */}
+      <Button
+        variant="contained"
+        onClick={handleNewChat}
+        startIcon={<AddIcon />}
+        sx={{
+          py: 1.8,
+          borderRadius: '16px',
+          fontWeight: 700,
+          textTransform: 'none',
+          background: 'linear-gradient(135deg, #7C3AED 0%, #3B82F6 100%)',
+          boxShadow: '0 8px 24px rgba(124,58,237,0.3)',
+          '&:hover': {
+            background: 'linear-gradient(135deg, #6D28D9 0%, #2563EB 100%)',
+            boxShadow: '0 12px 32px rgba(124,58,237,0.45)',
+          }
+        }}
+      >
+        New Chat Session
+      </Button>
+
+      {/* Chat Sessions History Container */}
+      <GlassCard 
+        sx={{ 
+          p: 2.5, 
+          borderRadius: '24px', 
+          flex: 1, 
+          display: 'flex', 
+          flexDirection: 'column', 
+          overflow: 'hidden',
+          background: isDark ? 'rgba(10, 15, 30, 0.45)' : 'rgba(255, 255, 255, 0.45)',
+          border: `1px solid ${isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)'}`,
+          boxShadow: isDark 
+            ? '0 12px 40px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.05)' 
+            : '0 12px 40px rgba(100,80,200,0.06), inset 0 1px 0 rgba(255,255,255,0.8)',
+        }}
+      >
+        <Stack direction="row" alignItems="center" justifyContent="space-between" mb={2}>
+          <Typography variant="subtitle2" fontWeight={800} sx={{ fontFamily: '"Space Grotesk", sans-serif', color: 'text.secondary' }}>
+            Chat History
+          </Typography>
+          {sessions.length > 1 && (
+            <IconButton 
+              size="small" 
+              onClick={handleClearAllSessions}
+              title="Clear All Chats"
+              sx={{ 
+                color: 'text.secondary', 
+                '&:hover': { color: 'error.light', background: 'rgba(239, 68, 68, 0.08)' } 
+              }}
+            >
+              <DeleteSweepIcon fontSize="small" />
+            </IconButton>
+          )}
+        </Stack>
+
+        {/* Search Box */}
+        <TextField
+          placeholder="Search conversations..."
+          size="small"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <SearchIcon sx={{ color: 'text.secondary', fontSize: 18 }} />
+              </InputAdornment>
+            ),
+            sx: {
+              borderRadius: '12px',
+              fontSize: '0.85rem',
+              mb: 2,
+              background: isDark ? 'rgba(255, 255, 255, 0.02)' : 'rgba(0, 0, 0, 0.02)',
+            }
+          }}
+          fullWidth
+        />
+        
+        <Box sx={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2, pr: 0.5 }}>
+          {Object.entries(getGroupedSessions()).map(([groupName, groupSessions]) => {
+            if (groupSessions.length === 0) return null;
+            return (
+              <Box key={groupName} sx={{ display: 'flex', flexDirection: 'column', gap: 0.8 }}>
+                <Typography 
+                  variant="caption" 
+                  fontWeight={750} 
+                  sx={{ 
+                    fontSize: '0.7rem', 
+                    textTransform: 'uppercase', 
+                    letterSpacing: '0.5px', 
+                    color: 'text.secondary', 
+                    opacity: 0.7, 
+                    mb: 0.5,
+                    pl: 1
+                  }}
+                >
+                  {groupName}
+                </Typography>
+                {groupSessions.map((sess) => {
+                  const isActive = sess.id === activeSessionId;
+                  const isEditing = sess.id === editingSessionId;
+                  return (
+                    <motion.div
+                      key={sess.id}
+                      whileHover={{ scale: isEditing ? 1 : 1.02 }}
+                      transition={{ type: "spring", stiffness: 400, damping: 17 }}
+                    >
+                      <Box
+                        onClick={() => !isEditing && selectSession(sess.id)}
+                        sx={{
+                          p: 1.5,
+                          borderRadius: '14px',
+                          cursor: isEditing ? 'default' : 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          background: isActive 
+                            ? 'rgba(124,58,237,0.12)' 
+                            : 'transparent',
+                          border: `1px solid ${isActive ? 'rgba(124,58,237,0.3)' : 'rgba(255,255,255,0.03)'}`,
+                          transition: 'background 0.2s ease, border-color 0.2s ease',
+                          '&:hover': {
+                            background: isEditing ? 'transparent' : 'rgba(255,255,255,0.05)',
+                            borderColor: isActive ? 'rgba(124,58,237,0.45)' : 'rgba(255,255,255,0.1)'
+                          }
+                        }}
+                      >
+                        <Stack direction="row" alignItems="center" spacing={1.5} sx={{ minWidth: 0, flex: 1 }}>
+                          <ChatIcon sx={{ color: isActive ? '#7C3AED' : 'text.secondary', fontSize: 18 }} />
+                          {isEditing ? (
+                            <TextField
+                              value={editingTitle}
+                              onChange={(e) => setEditingTitle(e.target.value)}
+                              onKeyDown={(e) => handleTitleKeyDown(sess.id, e)}
+                              autoFocus
+                              size="small"
+                              variant="standard"
+                              onClick={(e) => e.stopPropagation()}
+                              InputProps={{
+                                disableUnderline: false,
+                                sx: { 
+                                  fontSize: '0.85rem', 
+                                  fontWeight: 800, 
+                                  color: 'text.primary',
+                                }
+                              }}
+                              sx={{ flex: 1 }}
+                            />
+                          ) : (
+                            <Stack direction="column" sx={{ minWidth: 0, flex: 1, spacing: 0.3 }}>
+                              <Typography 
+                                variant="body2" 
+                                fontWeight={isActive ? 800 : 500} 
+                                color={isActive ? 'text.primary' : 'text.secondary'}
+                                noWrap 
+                                sx={{ fontSize: '0.85rem' }}
+                              >
+                                {sess.title}
+                              </Typography>
+                              <Typography 
+                                variant="caption" 
+                                color="text.secondary" 
+                                sx={{ fontSize: '0.68rem', opacity: 0.65 }}
+                              >
+                                {formatSessionDate(sess.createdAt || (sess.id.startsWith('session_') ? parseInt(sess.id.split('_')[1]) : Date.now()))}
+                              </Typography>
+                            </Stack>
+                          )}
+                        </Stack>
+
+                        {/* Session item action triggers */}
+                        <Stack direction="row" spacing={0.5} sx={{ ml: 1 }}>
+                          {isEditing ? (
+                            <IconButton 
+                              size="small" 
+                              onClick={(e) => saveTitle(sess.id, e)}
+                              sx={{ color: 'success.main' }}
+                            >
+                              <CheckIcon sx={{ fontSize: 16 }} />
+                            </IconButton>
+                          ) : (
+                            <>
+                              <IconButton 
+                                size="small" 
+                                className="edit-session-btn"
+                                onClick={(e) => startEditing(sess.id, sess.title, e)}
+                                sx={{ 
+                                  color: 'text.secondary', 
+                                  opacity: 0.4,
+                                  '&:hover': { opacity: 1, color: 'primary.light' } 
+                                }}
+                              >
+                                <EditIcon sx={{ fontSize: 14 }} />
+                              </IconButton>
+                              <IconButton 
+                                size="small" 
+                                onClick={(e) => handleDeleteSession(sess.id, e)}
+                                sx={{ 
+                                  color: 'text.secondary', 
+                                  opacity: 0.4,
+                                  '&:hover': { opacity: 1, color: 'error.light' } 
+                                }}
+                              >
+                                <DeleteIcon sx={{ fontSize: 14 }} />
+                              </IconButton>
+                            </>
+                          )}
+                        </Stack>
+                      </Box>
+                    </motion.div>
+                  );
+                })}
+              </Box>
+            );
+          })}
+        </Box>
+      </GlassCard>
+    </Box>
+  );
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', background: theme.palette.background.default }}>
+    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', background: theme.palette.background.default, position: 'relative', overflow: 'hidden' }}>
       <AppSidebar />
+
+      {/* Decorative Blur Spheres for deep glassmorphism overlay */}
+      <Box sx={{
+        position: 'absolute',
+        top: '15%',
+        left: '8%',
+        width: '320px',
+        height: '320px',
+        background: 'radial-gradient(circle, rgba(124,58,237,0.18) 0%, transparent 70%)',
+        filter: 'blur(60px)',
+        zIndex: 0,
+        pointerEvents: 'none'
+      }} />
+      <Box sx={{
+        position: 'absolute',
+        bottom: '15%',
+        right: '12%',
+        width: '380px',
+        height: '380px',
+        background: 'radial-gradient(circle, rgba(37,99,235,0.14) 0%, transparent 70%)',
+        filter: 'blur(70px)',
+        zIndex: 0,
+        pointerEvents: 'none'
+      }} />
 
       {/* Main Container */}
       <Box 
         component="main" 
         sx={{ 
           flex: 1, 
-          p: { xs: 2, sm: 3, md: 5 }, 
+          p: { xs: 2, sm: 3, md: 4 }, 
           pt: { xs: 11, sm: 12, md: 14 }, 
-          pb: { xs: 5, md: 5 },
+          pb: { xs: 4, md: 4 },
           display: 'flex',
           justifyContent: 'center',
-          alignItems: 'stretch'
+          alignItems: 'stretch',
+          position: 'relative',
+          zIndex: 1
         }}
       >
-        <Grid container spacing={4} sx={{ maxWidth: '1200px', width: '100%', mx: 'auto' }}>
+        <Grid container spacing={3} sx={{ maxWidth: '1280px', width: '100%', mx: 'auto', alignItems: 'stretch' }}>
           
-          {/* Left panel: New Chat + Chat History Session Sidebar */}
-          <Grid item xs={12} md={4} sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-            
-            {/* New Chat Button Launcher */}
-            <Button
-              variant="contained"
-              onClick={handleNewChat}
-              startIcon={<AddIcon />}
-              sx={{
-                py: 1.8,
-                borderRadius: '16px',
-                fontWeight: 700,
-                textTransform: 'none',
-                background: 'linear-gradient(135deg, #7C3AED 0%, #3B82F6 100%)',
-                boxShadow: '0 8px 24px rgba(124,58,237,0.3)',
-                '&:hover': {
-                  background: 'linear-gradient(135deg, #6D28D9 0%, #2563EB 100%)',
-                }
-              }}
-            >
-              New Chat Session
-            </Button>
-            
-            {/* Chat Sessions History list */}
-            <GlassCard sx={{ p: 2.5, borderRadius: '24px', flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-              <Stack direction="row" alignItems="center" justifyContent="space-between" mb={2}>
-                <Typography variant="subtitle2" fontWeight={800} sx={{ fontFamily: '"Space Grotesk", sans-serif', color: 'text.secondary' }}>
-                  Chat History
-                </Typography>
-                {sessions.length > 1 && (
-                  <IconButton 
-                    size="small" 
-                    onClick={handleClearAllSessions}
-                    title="Clear All Chats"
-                    sx={{ 
-                      color: 'text.secondary', 
-                      '&:hover': { color: 'error.light', background: 'rgba(239, 68, 68, 0.08)' } 
-                    }}
-                  >
-                    <DeleteSweepIcon fontSize="small" />
-                  </IconButton>
-                )}
-              </Stack>
-
-              {/* Search Box */}
-              <TextField
-                placeholder="Search conversations..."
-                size="small"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <SearchIcon sx={{ color: 'text.secondary', fontSize: 18 }} />
-                    </InputAdornment>
-                  ),
-                  sx: {
-                    borderRadius: '12px',
-                    fontSize: '0.85rem',
-                    mb: 2,
-                    background: isDark ? 'rgba(255, 255, 255, 0.02)' : 'rgba(0, 0, 0, 0.02)',
-                  }
-                }}
-                fullWidth
-              />
-              
-              <Box sx={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2, pr: 0.5 }}>
-                {Object.entries(getGroupedSessions()).map(([groupName, groupSessions]) => {
-                  if (groupSessions.length === 0) return null;
-                  return (
-                    <Box key={groupName} sx={{ display: 'flex', flexDirection: 'column', gap: 0.8 }}>
-                      <Typography 
-                        variant="caption" 
-                        fontWeight={750} 
-                        sx={{ 
-                          fontSize: '0.7rem', 
-                          textTransform: 'uppercase', 
-                          letterSpacing: '0.5px', 
-                          color: 'text.secondary', 
-                          opacity: 0.7, 
-                          mb: 0.5,
-                          pl: 1
-                        }}
-                      >
-                        {groupName}
-                      </Typography>
-                      {groupSessions.map((sess) => {
-                        const isActive = sess.id === activeSessionId;
-                        const isEditing = sess.id === editingSessionId;
-                        return (
-                          <Box
-                            key={sess.id}
-                            onClick={() => !isEditing && setActiveSessionId(sess.id)}
-                            sx={{
-                              p: 1.5,
-                              borderRadius: '14px',
-                              cursor: isEditing ? 'default' : 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'space-between',
-                              background: isActive 
-                                ? 'rgba(124,58,237,0.1)' 
-                                : 'transparent',
-                              border: `1px solid ${isActive ? 'rgba(124,58,237,0.25)' : 'rgba(255,255,255,0.05)'}`,
-                              transition: 'all 0.2s ease',
-                              '&:hover': {
-                                background: isEditing ? 'transparent' : 'rgba(255,255,255,0.03)',
-                                borderColor: isActive ? 'rgba(124,58,237,0.35)' : 'rgba(255,255,255,0.1)'
-                              }
-                            }}
-                          >
-                            <Stack direction="row" alignItems="center" spacing={1.5} sx={{ minWidth: 0, flex: 1 }}>
-                              <ChatIcon sx={{ color: isActive ? '#7C3AED' : 'text.secondary', fontSize: 18 }} />
-                              {isEditing ? (
-                                <TextField
-                                  value={editingTitle}
-                                  onChange={(e) => setEditingTitle(e.target.value)}
-                                  onKeyDown={(e) => handleTitleKeyDown(sess.id, e)}
-                                  autoFocus
-                                  size="small"
-                                  variant="standard"
-                                  onClick={(e) => e.stopPropagation()}
-                                  InputProps={{
-                                    disableUnderline: false,
-                                    sx: { 
-                                      fontSize: '0.85rem', 
-                                      fontWeight: 800, 
-                                      color: 'text.primary',
-                                    }
-                                  }}
-                                  sx={{ flex: 1 }}
-                                />
-                              ) : (
-                                <Stack direction="column" sx={{ minWidth: 0, flex: 1, spacing: 0.3 }}>
-                                  <Typography 
-                                    variant="body2" 
-                                    fontWeight={isActive ? 800 : 500} 
-                                    color={isActive ? 'text.primary' : 'text.secondary'}
-                                    noWrap 
-                                    sx={{ fontSize: '0.85rem' }}
-                                  >
-                                    {sess.title}
-                                  </Typography>
-                                  <Typography 
-                                    variant="caption" 
-                                    color="text.secondary" 
-                                    sx={{ fontSize: '0.68rem', opacity: 0.65 }}
-                                  >
-                                    {formatSessionDate(sess.createdAt || (sess.id.startsWith('session_') ? parseInt(sess.id.split('_')[1]) : Date.now()))}
-                                  </Typography>
-                                </Stack>
-                              )}
-                            </Stack>
-
-                            {/* Session item action triggers */}
-                            <Stack direction="row" spacing={0.5} sx={{ ml: 1 }}>
-                              {isEditing ? (
-                                <IconButton 
-                                  size="small" 
-                                  onClick={(e) => saveTitle(sess.id, e)}
-                                  sx={{ color: 'success.main' }}
-                                >
-                                  <CheckIcon sx={{ fontSize: 16 }} />
-                                </IconButton>
-                              ) : (
-                                <>
-                                  <IconButton 
-                                    size="small" 
-                                    className="edit-session-btn"
-                                    onClick={(e) => startEditing(sess.id, sess.title, e)}
-                                    sx={{ 
-                                      color: 'text.secondary', 
-                                      opacity: 0.3,
-                                      '&:hover': { opacity: 1, color: 'primary.light' } 
-                                    }}
-                                  >
-                                    <EditIcon sx={{ fontSize: 14 }} />
-                                  </IconButton>
-                                  <IconButton 
-                                    size="small" 
-                                    onClick={(e) => handleDeleteSession(sess.id, e)}
-                                    sx={{ 
-                                      color: 'text.secondary', 
-                                      opacity: 0.3,
-                                      '&:hover': { opacity: 1, color: 'error.light' } 
-                                    }}
-                                  >
-                                    <DeleteIcon sx={{ fontSize: 14 }} />
-                                  </IconButton>
-                                </>
-                              )}
-                            </Stack>
-                          </Box>
-                        );
-                      })}
-                    </Box>
-                  );
-                })}
-              </Box>
-
-              <Divider sx={{ my: 2, opacity: 0.5 }} />
-
-              {/* Bot Meta Info */}
-              <Stack direction="row" alignItems="center" spacing={1.2} sx={{ opacity: 0.8 }}>
-                <SecurityIcon sx={{ color: 'success.main', fontSize: 16 }} />
-                <Typography variant="caption" fontWeight={700} color="success.main">NSFW & Privacy Shield Active</Typography>
-              </Stack>
-            </GlassCard>
+          {/* Left panel (Desktop Only): Sessions List */}
+          <Grid item xs={0} md={4} sx={{ display: { xs: 'none', md: 'flex' }, flexDirection: 'column' }}>
+            {renderSidebarContent()}
           </Grid>
 
           {/* Right panel: Main Chat Window */}
-          <Grid item xs={12} md={8} sx={{ display: 'flex', flexDirection: 'column' }}>
+          <Grid item xs={12} md={8} sx={{ display: 'flex', flexDirection: 'column', height: { xs: 'calc(100vh - 120px)', md: 'auto' } }}>
             <GlassCard 
               sx={{ 
                 flex: 1, 
@@ -506,75 +557,104 @@ function AIChat() {
                 p: 0, 
                 display: 'flex', 
                 flexDirection: 'column', 
-                height: { xs: '500px', md: '100%' },
-                background: isDark ? 'rgba(5,8,16,0.5)' : '#ffffff',
+                height: '100%',
+                background: isDark ? 'rgba(5, 8, 16, 0.45)' : 'rgba(255, 255, 255, 0.55)',
+                border: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'}`,
+                boxShadow: isDark 
+                  ? '0 16px 48px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.05)' 
+                  : '0 16px 48px rgba(100,80,200,0.08), inset 0 1px 0 rgba(255,255,255,0.9)',
                 overflow: 'hidden'
               }}
             >
               {/* Header */}
               <Box sx={{ p: 2.5, borderBottom: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <Stack direction="row" spacing={1.5} alignItems="center">
-                  <Avatar sx={{ background: 'linear-gradient(135deg, #7C3AED, #3B82F6)', width: 36, height: 36 }}>
-                    <SmartToyIcon sx={{ fontSize: 20 }} />
+                  {/* Mobile Sidebar Toggle Trigger Button */}
+                  <IconButton
+                    color="inherit"
+                    aria-label="open drawer"
+                    edge="start"
+                    onClick={handleDrawerToggle}
+                    sx={{ mr: 0.5, display: { md: 'none' }, color: 'text.secondary' }}
+                  >
+                    <MenuIcon />
+                  </IconButton>
+
+                  <Avatar sx={{ background: 'linear-gradient(135deg, #7C3AED, #3B82F6)', width: 38, height: 38, boxShadow: '0 4px 12px rgba(124,58,237,0.3)' }}>
+                    <SmartToyIcon sx={{ fontSize: 21 }} />
                   </Avatar>
                   <Box>
-                    <Typography variant="subtitle2" fontWeight={800}>Product AI bot</Typography>
-                    <Typography variant="caption" color="success.main" fontWeight={700}>System Active</Typography>
+                    <Typography variant="subtitle2" fontWeight={800} sx={{ fontFamily: '"Space Grotesk", sans-serif' }}>Product AI Companion</Typography>
+                    <Stack direction="row" alignItems="center" spacing={0.8}>
+                      <Box sx={{ width: 7, height: 7, borderRadius: '50%', background: '#10B981', boxShadow: '0 0 8px #10B981', animation: 'drift 2.5s infinite ease-in-out' }} />
+                      <Typography variant="caption" color="success.main" fontWeight={750}>Active</Typography>
+                    </Stack>
                   </Box>
                 </Stack>
-                <Chip icon={<InfoOutlinedIcon sx={{ fontSize: '14px !important' }} />} label="Mistral Low Token Mode" size="small" sx={{ fontWeight: 700, background: 'rgba(124,58,237,0.12)', color: '#7C3AED' }} />
               </Box>
 
               {/* Chat history logs */}
-              <Box sx={{ flex: 1, overflowY: 'auto', p: 3, display: 'flex', flexDirection: 'column', gap: 2.5 }}>
-                {chatHistory.map((item, idx) => {
-                  const isOwn = item.sender === 'User';
-                  return (
-                    <Box
-                      key={idx}
-                      sx={{
-                        alignSelf: isOwn ? 'flex-end' : 'flex-start',
-                        maxWidth: '80%',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: isOwn ? 'flex-end' : 'flex-start'
-                      }}
-                    >
-                      <Typography variant="caption" sx={{ color: isOwn ? '#A78BFA' : '#7C3AED', fontWeight: 800, mb: 0.5, fontSize: '0.72rem' }}>
-                        {isOwn ? 'You' : 'Conectify Product AI'}
-                      </Typography>
-                      <Box
-                        sx={{
-                          background: isOwn 
-                            ? 'linear-gradient(135deg, #7C3AED, #3B82F6)' 
-                            : isDark ? 'rgba(255,255,255,0.02)' : '#f8fafc',
-                          color: isOwn ? 'white' : 'text.primary',
-                          p: 2.2,
-                          borderRadius: isOwn ? '20px 20px 4px 20px' : '20px 20px 20px 4px',
-                          border: isOwn ? 'none' : `1px solid ${isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.05)'}`,
-                          boxShadow: '0 4px 16px rgba(0,0,0,0.04)',
+              <Box sx={{ flex: 1, overflowY: 'auto', p: { xs: 2.2, sm: 3 }, display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+                <AnimatePresence initial={false}>
+                  {chatHistory.map((item, idx) => {
+                    const isOwn = item.sender === 'User';
+                    return (
+                      <motion.div
+                        key={idx}
+                        initial={{ opacity: 0, y: 20, scale: 0.96 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        transition={{ type: "spring", stiffness: 350, damping: 24 }}
+                        style={{
+                          alignSelf: isOwn ? 'flex-end' : 'flex-start',
+                          maxWidth: '85%',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: isOwn ? 'flex-end' : 'flex-start'
                         }}
                       >
-                        <Typography variant="body2" sx={{ lineHeight: 1.6, whiteSpace: 'pre-line' }}>
-                          {item.text}
+                        <Typography variant="caption" sx={{ color: isOwn ? '#A78BFA' : '#7C3AED', fontWeight: 800, mb: 0.6, fontSize: '0.72rem', letterSpacing: '0.3px' }}>
+                          {isOwn ? 'You' : 'Conectify Assistant'}
                         </Typography>
-                      </Box>
-                    </Box>
-                  );
-                })}
+                        <Box
+                          sx={{
+                            background: isOwn 
+                              ? 'linear-gradient(135deg, #7C3AED, #3B82F6)' 
+                              : isDark ? 'rgba(255,255,255,0.03)' : '#f3f4f6',
+                            color: isOwn ? 'white' : 'text.primary',
+                            p: { xs: 1.8, sm: 2.2 },
+                            borderRadius: isOwn ? '20px 20px 4px 20px' : '20px 20px 20px 4px',
+                            border: isOwn ? 'none' : `1px solid ${isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)'}`,
+                            boxShadow: isDark 
+                              ? '0 6px 20px rgba(0,0,0,0.2)' 
+                              : '0 6px 20px rgba(100,80,200,0.03)',
+                            backdropFilter: isOwn ? 'none' : 'blur(10px)',
+                          }}
+                        >
+                          <Typography variant="body2" sx={{ lineHeight: 1.6, whiteSpace: 'pre-line', fontSize: { xs: '0.85rem', sm: '0.88rem' } }}>
+                            {item.text}
+                          </Typography>
+                        </Box>
+                      </motion.div>
+                    );
+                  })}
+                </AnimatePresence>
 
                 {aiLoading && (
-                  <Box sx={{ alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    style={{ alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: 1.5 }}
+                  >
                     <CircularProgress size={16} sx={{ color: '#7C3AED' }} />
-                    <Typography variant="caption" color="text.secondary" fontWeight={600}>AI is processing your query...</Typography>
-                  </Box>
+                    <Typography variant="caption" color="text.secondary" fontWeight={600}>AI is crafting a response...</Typography>
+                  </motion.div>
                 )}
                 <div ref={chatEndRef} />
               </Box>
 
               {/* Input Area */}
-              <Box sx={{ p: 2.5, borderTop: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}`, background: isDark ? 'rgba(0,0,0,0.1)' : '#f8fafc' }}>
-                <Stack direction="row" spacing={2}>
+              <Box sx={{ p: 2.5, borderTop: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}`, background: isDark ? 'rgba(5, 8, 16, 0.3)' : 'rgba(240, 242, 255, 0.4)' }}>
+                <Stack direction="row" spacing={1.5}>
                   <TextField
                     placeholder="Ask Conectify AI product helper..."
                     fullWidth
@@ -603,6 +683,7 @@ function AIChat() {
                       boxShadow: '0 4px 16px rgba(124,58,237,0.3)',
                       '&:hover': {
                         background: 'linear-gradient(135deg, #6D28D9 0%, #1D4ED8 100%)',
+                        boxShadow: '0 6px 20px rgba(124,58,237,0.45)',
                       }
                     }}
                   >
@@ -616,6 +697,30 @@ function AIChat() {
 
         </Grid>
       </Box>
+
+      {/* Slide-out off-canvas Drawer for Mobile/Tablet Screens */}
+      <Drawer
+        variant="temporary"
+        open={mobileOpen}
+        onClose={handleDrawerToggle}
+        ModalProps={{
+          keepMounted: true, // Better open performance on mobile.
+        }}
+        sx={{
+          display: { xs: 'block', md: 'none' },
+          '& .MuiDrawer-paper': { 
+            boxSizing: 'border-box', 
+            width: 290,
+            p: 2.5,
+            pt: 4,
+            background: isDark ? 'rgba(10, 12, 22, 0.85)' : 'rgba(255, 255, 255, 0.9)',
+            backdropFilter: 'blur(20px)',
+            borderRight: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}`,
+          },
+        }}
+      >
+        {renderSidebarContent()}
+      </Drawer>
     </Box>
   );
 }

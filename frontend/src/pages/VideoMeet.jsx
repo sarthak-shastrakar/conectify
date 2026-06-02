@@ -56,7 +56,7 @@ export default function VideoMeetComponent() {
   var socketRef = useRef();
   let socketIdRef = useRef();
   let localVideoref = useRef();
-  const { userData } = useContext(AuthContext);
+  const { userData, isLoading } = useContext(AuthContext);
 
   let [videoAvailable, setVideoAvailable] = useState(true);
   let [audioAvailable, setAudioAvailable] = useState(true);
@@ -70,6 +70,14 @@ export default function VideoMeetComponent() {
   let [newMessages, setNewMessages] = useState(0);
   let [askForUsername, setAskForUsername] = useState(true);
   let [username, setUsername] = useState("");
+
+  useEffect(() => {
+    if (!isLoading && userData) {
+      setUsername(userData.name || userData.username || "");
+    }
+  }, [isLoading, userData]);
+
+
 
   const videoRef = useRef([]);
   let [videos, setVideos] = useState([]);
@@ -680,6 +688,14 @@ export default function VideoMeetComponent() {
   };
 
   const currentRoomId = window.location.pathname.split("/").pop();
+
+  if (isLoading) {
+    return (
+      <Box sx={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#050810' }}>
+        <CircularProgress sx={{ color: '#7C3AED' }} />
+      </Box>
+    );
+  }
 
   return (
     <Box sx={{ minHeight: "100vh", position: "relative", overflow: "hidden" }}>

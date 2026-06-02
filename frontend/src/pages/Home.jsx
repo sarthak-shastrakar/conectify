@@ -61,36 +61,7 @@ function Home() {
   const [recentMeetings, setRecentMeetings] = React.useState([]);
   const [welcomeToast, setWelcomeToast] = useState(false);
 
-  // AI Chatbot States
-  const [chatbotOpen, setChatbotOpen] = useState(false);
-  const [chatQuery, setChatQuery] = useState('');
-  const [chatHistory, setChatHistory] = useState([
-    { sender: 'AI', text: 'Hi! I am Conectify AI. How can I help you today? 🤖' }
-  ]);
-  const [aiLoading, setAiLoading] = useState(false);
 
-  const handleSendChatMessage = async () => {
-    if (!chatQuery.trim()) return;
-    const userMsg = { sender: 'User', text: chatQuery };
-    setChatHistory((prev) => [...prev, userMsg]);
-    const currentQuery = chatQuery;
-    setChatQuery('');
-    setAiLoading(true);
-
-    try {
-      const res = await api.post(API_ROUTES.CHATBOT, {
-        message: currentQuery,
-        chatHistory: chatHistory
-      });
-      const aiReply = { sender: 'AI', text: res.data.reply };
-      setChatHistory((prev) => [...prev, aiReply]);
-    } catch (err) {
-      console.error("AI chat failed:", err);
-      setChatHistory((prev) => [...prev, { sender: 'AI', text: 'Sorry, I failed to connect. Please try again! ⚠️' }]);
-    } finally {
-      setAiLoading(false);
-    }
-  };
 
   React.useEffect(() => {
     // Page Title for SEO and automation tracking
@@ -120,6 +91,14 @@ function Home() {
   };
 
   const thisWeekCount = recentMeetings.filter(m => (new Date() - new Date(m.date)) / (1000 * 60 * 60 * 24) <= 7).length;
+
+  const todayMeetings = recentMeetings.filter(m => {
+    const today = new Date();
+    const meetingDate = new Date(m.date);
+    return meetingDate.getDate() === today.getDate() &&
+      meetingDate.getMonth() === today.getMonth() &&
+      meetingDate.getFullYear() === today.getFullYear();
+  });
 
   const stringToColor = (str = '') => {
     let hash = 0;
@@ -428,9 +407,9 @@ function Home() {
                   </Button>
                 </Stack>
 
-                {recentMeetings.length > 0 ? (
+                {todayMeetings.length > 0 ? (
                   <Stack spacing={2}>
-                    {recentMeetings.slice(0, 4).map((m, i) => (
+                    {todayMeetings.slice(0, 4).map((m, i) => (
                       <GlassCard
                         key={i}
                         sx={{
@@ -550,9 +529,9 @@ function Home() {
                     }}>
                       <HistoryIcon sx={{ fontSize: 32, color: '#7C3AED', opacity: 0.8 }} />
                     </Box>
-                    <Typography variant="h6" fontWeight={700} mb={1} sx={{ fontFamily: '"Space Grotesk", sans-serif' }}>No history yet</Typography>
+                    <Typography variant="h6" fontWeight={700} mb={1} sx={{ fontFamily: '"Space Grotesk", sans-serif' }}>No meetings today</Typography>
                     <Typography variant="body2" color="text.secondary" sx={{ maxWidth: '280px', mx: 'auto', lineHeight: 1.6, fontSize: '0.88rem' }}>
-                      Your completed video meetings and instant calls will appear here automatically.
+                      Your completed video meetings and instant calls today will appear here. The "View all" page has your complete history.
                     </Typography>
                   </GlassCard>
                 )}
@@ -711,169 +690,7 @@ function Home() {
         message={`Welcome back to Conectify, ${userData?.name || 'User'}! ✨`}
       />
 
-      {/* Floating AI Chatbot Launcher */}
-      <Box
-        sx={{
-          position: 'fixed',
-          bottom: 24,
-          right: 24,
-          zIndex: 99,
-        }}
-      >
-        <IconButton
-          onClick={() => setChatbotOpen(!chatbotOpen)}
-          sx={{
-            width: 56,
-            height: 56,
-            background: 'linear-gradient(135deg, #7C3AED 0%, #3B82F6 100%)',
-            color: 'white',
-            boxShadow: '0 8px 32px rgba(124,58,237,0.4)',
-            transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
-            '&:hover': {
-              transform: 'scale(1.1) rotate(6deg)',
-              boxShadow: '0 12px 40px rgba(124,58,237,0.5)',
-            }
-          }}
-        >
-          {chatbotOpen ? <CloseIcon /> : <SmartToyIcon />}
-        </IconButton>
-      </Box>
 
-      {/* AI Chatbot Drawer Panel */}
-      {chatbotOpen && (
-        <GlassCard
-          sx={{
-            position: 'fixed',
-            bottom: 92,
-            right: 24,
-            width: { xs: 'calc(100% - 48px)', sm: 360 },
-            height: 480,
-            zIndex: 98,
-            borderRadius: '24px',
-            p: 0,
-            overflow: 'hidden',
-            display: 'flex',
-            flexDirection: 'column',
-            background: isDark ? 'rgba(8,12,24,0.92)' : 'rgba(255,255,255,0.95)',
-            border: '1px solid rgba(255,255,255,0.1)',
-            boxShadow: '0 20px 50px rgba(0,0,0,0.4)',
-            animation: 'fadeInUp 0.25s ease both'
-          }}
-        >
-          {/* Header */}
-          <Box
-            sx={{
-              p: 2,
-              background: 'linear-gradient(135deg, rgba(124,58,237,0.12), rgba(59,130,246,0.12))',
-              borderBottom: '1px solid rgba(255,255,255,0.06)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between'
-            }}
-          >
-            <Stack direction="row" alignItems="center" spacing={1}>
-              <Avatar sx={{ background: 'linear-gradient(135deg, #7C3AED, #3B82F6)', width: 32, height: 32 }}>
-                <SmartToyIcon sx={{ fontSize: 18 }} />
-              </Avatar>
-              <Box>
-                <Typography variant="subtitle2" fontWeight={800} color="text.primary">Conectify AI</Typography>
-                <Typography variant="caption" color="success.main" fontWeight={700}>Online</Typography>
-              </Box>
-            </Stack>
-            <IconButton size="small" onClick={() => setChatbotOpen(false)} sx={{ color: 'text.secondary' }}>
-              <CloseIcon fontSize="small" />
-            </IconButton>
-          </Box>
-
-          {/* Chat Messages Log */}
-          <Box
-            sx={{
-              flex: 1,
-              p: 2,
-              overflowY: 'auto',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 1.5
-            }}
-          >
-            {chatHistory.map((msg, index) => (
-              <Box
-                key={index}
-                sx={{
-                  alignSelf: msg.sender === 'User' ? 'flex-end' : 'flex-start',
-                  maxWidth: '82%',
-                }}
-              >
-                <Box
-                  sx={{
-                    background: msg.sender === 'User'
-                      ? 'linear-gradient(135deg, #7C3AED, #3B82F6)'
-                      : isDark ? 'rgba(255,255,255,0.03)' : '#f1f5f9',
-                    color: msg.sender === 'User' ? 'white' : 'text.primary',
-                    px: 1.8,
-                    py: 1,
-                    borderRadius: msg.sender === 'User' ? '18px 18px 2px 18px' : '18px 18px 18px 2px',
-                    border: msg.sender === 'User' ? 'none' : '1px solid rgba(255,255,255,0.04)',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
-                  }}
-                >
-                  <Typography variant="body2" sx={{ lineHeight: 1.5, wordBreak: 'break-word', whiteSpace: 'pre-line' }}>
-                    {msg.text}
-                  </Typography>
-                </Box>
-              </Box>
-            ))}
-
-            {aiLoading && (
-              <Box sx={{ alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: 1 }}>
-                <CircularProgress size={16} sx={{ color: '#7C3AED' }} />
-                <Typography variant="caption" color="text.secondary">AI is typing...</Typography>
-              </Box>
-            )}
-          </Box>
-
-          {/* Footer Input Area */}
-          <Box
-            sx={{
-              p: 1.5,
-              borderTop: '1px solid rgba(255,255,255,0.06)',
-              background: isDark ? 'rgba(0,0,0,0.1)' : '#f8fafc',
-              display: 'flex',
-              gap: 1
-            }}
-          >
-            <TextField
-              size="small"
-              placeholder="Ask anything..."
-              fullWidth
-              value={chatQuery}
-              onChange={(e) => setChatQuery(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') handleSendChatMessage();
-              }}
-              InputProps={{
-                sx: {
-                  borderRadius: '100px',
-                  background: isDark ? 'rgba(255,255,255,0.03)' : '#ffffff',
-                }
-              }}
-            />
-            <IconButton
-              onClick={handleSendChatMessage}
-              disabled={aiLoading || !chatQuery.trim()}
-              sx={{
-                background: 'rgba(124,58,237,0.12)',
-                color: '#7C3AED',
-                '&:hover': {
-                  background: 'rgba(124,58,237,0.2)',
-                }
-              }}
-            >
-              <SendIcon fontSize="small" />
-            </IconButton>
-          </Box>
-        </GlassCard>
-      )}
     </Box>
   );
 }

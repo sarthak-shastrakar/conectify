@@ -1,4 +1,4 @@
-import React, { useContext, useEffect } from 'react';
+import React, { useContext, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
@@ -6,19 +6,29 @@ import Grid from '@mui/material/Grid';
 import Typography from '@mui/material/Typography';
 import Avatar from '@mui/material/Avatar';
 import CircularProgress from '@mui/material/CircularProgress';
+import Button from '@mui/material/Button';
+import Dialog from '@mui/material/Dialog';
+import DialogTitle from '@mui/material/DialogTitle';
+import DialogContent from '@mui/material/DialogContent';
+import DialogContentText from '@mui/material/DialogContentText';
+import DialogActions from '@mui/material/DialogActions';
 import BadgeIcon from '@mui/icons-material/Badge';
 import PersonIcon from '@mui/icons-material/Person';
 import EmailIcon from '@mui/icons-material/Email';
 import CameraAltIcon from '@mui/icons-material/CameraAlt';
 import SecurityIcon from '@mui/icons-material/Security';
 import VerifiedIcon from '@mui/icons-material/Verified';
+import LogoutIcon from '@mui/icons-material/Logout';
+import DeleteForeverIcon from '@mui/icons-material/DeleteForever';
 import { useTheme } from '@mui/material/styles';
+import { motion } from 'framer-motion';
 import { AuthContext } from '../contexts/AuthContext';
 import AppSidebar from './Navbar';
+import GlassCard from '../components/ui/GlassCard';
 import GradientText from '../components/ui/GradientText';
 import api from '../utils/api';
 
-// Custom cardless InfoTile component for high-end staggered display
+// Custom cardless InfoTile component for high-end glassmorphism display
 const InfoTile = ({ icon, label, value, accentColor, bgLight, bgDark, delay, isDark }) => {
   return (
     <Box
@@ -126,12 +136,14 @@ const InfoTile = ({ icon, label, value, accentColor, bgLight, bgDark, delay, isD
 };
 
 export default function Profile() {
-  const { userData, setUserData, getProfile } = useContext(AuthContext);
+  const { userData, setUserData, getProfile, logout } = useContext(AuthContext);
   const theme = useTheme();
   const navigate = useNavigate();
   const isDark = theme.palette.mode === 'dark';
   const fileInputRef = React.useRef(null);
-  const [isUploading, setIsUploading] = React.useState(false);
+  
+  const [isUploading, setIsUploading] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
   useEffect(() => { 
     getProfile(); 
@@ -175,6 +187,19 @@ export default function Profile() {
     reader.readAsDataURL(file);
   };
 
+  const handleDeleteAccount = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      await api.post("/delete_account", { token });
+      localStorage.removeItem("token");
+      setUserData(null);
+      setDeleteConfirmOpen(false);
+      navigate("/auth");
+    } catch (err) {
+      alert("Failed to delete account");
+    }
+  };
+
   return (
     <Box 
       sx={{ 
@@ -190,17 +215,17 @@ export default function Profile() {
     >
       <AppSidebar />
 
-      {/* Decorative Drifting Ambient Blobs */}
+      {/* Decorative Drifting Ambient Glassmorphism Blobs */}
       <Box 
         sx={{
           position: 'absolute',
           top: '20%',
-          left: '10%',
-          width: { xs: 200, md: 350 },
-          height: { xs: 200, md: 350 },
+          left: '8%',
+          width: { xs: 240, md: 360 },
+          height: { xs: 240, md: 360 },
           borderRadius: '50%',
-          background: 'radial-gradient(circle, rgba(124,58,237,0.12) 0%, transparent 70%)',
-          filter: 'blur(50px)',
+          background: 'radial-gradient(circle, rgba(124,58,237,0.14) 0%, transparent 70%)',
+          filter: 'blur(55px)',
           animation: 'drift 10s ease-in-out infinite',
           zIndex: 0,
           pointerEvents: 'none'
@@ -210,12 +235,12 @@ export default function Profile() {
         sx={{
           position: 'absolute',
           bottom: '15%',
-          right: '10%',
-          width: { xs: 250, md: 400 },
-          height: { xs: 250, md: 400 },
+          right: '8%',
+          width: { xs: 260, md: 410 },
+          height: { xs: 260, md: 410 },
           borderRadius: '50%',
-          background: 'radial-gradient(circle, rgba(37,99,235,0.08) 0%, transparent 70%)',
-          filter: 'blur(60px)',
+          background: 'radial-gradient(circle, rgba(37,99,235,0.09) 0%, transparent 70%)',
+          filter: 'blur(65px)',
           animation: 'drift 12s ease-in-out 2s infinite reverse',
           zIndex: 0,
           pointerEvents: 'none'
@@ -226,27 +251,44 @@ export default function Profile() {
         component="main" 
         sx={{ 
           flex: 1, 
-          p: { xs: 3, md: 6 }, 
+          p: { xs: 2.5, sm: 4, md: 6 }, 
           pt: { xs: 12, md: 15 }, 
           pb: { xs: 6, md: 8 }, 
           display: 'flex', 
           flexDirection: 'column', 
           alignItems: 'center', 
           justifyContent: 'center',
+          position: 'relative',
           zIndex: 1
         }}
       >
         
         {userData ? (
-          <Box sx={{ width: '100%', maxWidth: 960, animation: 'fadeInUp 0.5s ease both' }}>
+          <Box sx={{ width: '100%', maxWidth: 1000, animation: 'fadeInUp 0.5s ease both' }}>
             
-            <Grid container spacing={{ xs: 5, md: 8 }} alignItems="center">
+            <Grid container spacing={{ xs: 4, md: 6 }} alignItems="stretch">
               
-              {/* Left Column: Avatar & Identity Cardless Area */}
-              <Grid item xs={12} md={5}>
-                <Stack alignItems="center" spacing={3} sx={{ textAlign: 'center' }}>
+              {/* Left Column: Avatar & Holographic Info Badge Card */}
+              <Grid item xs={12} md={5} sx={{ display: 'flex' }}>
+                <GlassCard
+                  sx={{
+                    flex: 1,
+                    p: 4,
+                    borderRadius: '28px',
+                    background: isDark ? 'rgba(10, 15, 30, 0.45)' : 'rgba(255, 255, 255, 0.55)',
+                    border: `1px solid ${isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)'}`,
+                    boxShadow: isDark 
+                      ? '0 16px 48px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.05)' 
+                      : '0 16px 48px rgba(100,80,200,0.04), inset 0 1px 0 rgba(255,255,255,0.8)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    textAlign: 'center'
+                  }}
+                >
                   
-                  {/* Hidden file input */}
+                  {/* Hidden file input for avatar uploading */}
                   <input 
                     type="file" 
                     accept="image/*" 
@@ -255,7 +297,7 @@ export default function Profile() {
                     onChange={handleFileChange} 
                   />
 
-                  {/* Avatar wrapper with dynamic holographic orbits */}
+                  {/* Avatar wrapper with concentric glowing circles */}
                   <Box 
                     onClick={handleAvatarClick}
                     sx={{ 
@@ -352,15 +394,16 @@ export default function Profile() {
                     </Box>
                   </Box>
 
-                  {/* Name and Identity */}
-                  <Stack spacing={1} alignItems="center" sx={{ mt: 1 }}>
+                  {/* Name and Capsule details */}
+                  <Stack spacing={1.5} alignItems="center" sx={{ mt: 3.5 }}>
                     <GradientText 
                       variant="h3" 
                       sx={{ 
-                        fontWeight: 800, 
+                        fontWeight: 900, 
                         letterSpacing: '-1px',
-                        fontSize: { xs: '2rem', md: '2.5rem' },
-                        textAlign: 'center'
+                        fontSize: { xs: '1.8rem', md: '2.3rem' },
+                        textAlign: 'center',
+                        fontFamily: '"Space Grotesk", sans-serif'
                       }}
                     >
                       {userData.name}
@@ -375,18 +418,17 @@ export default function Profile() {
                         background: isDark ? 'rgba(99, 102, 241, 0.08)' : 'rgba(99, 102, 241, 0.04)',
                         border: `1px solid ${isDark ? 'rgba(99, 102, 241, 0.18)' : 'rgba(99, 102, 241, 0.1)'}`,
                         backdropFilter: 'blur(10px)',
-                        WebkitBackdropFilter: 'blur(10px)',
                         display: 'inline-flex',
                         alignItems: 'center',
                         boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)'
                       }}
                     >
-                      <Typography variant="body2" sx={{ fontWeight: 700, color: isDark ? '#a78bfa' : '#6366f1', fontSize: '0.875rem' }}>
+                      <Typography variant="body2" sx={{ fontWeight: 800, color: isDark ? '#a78bfa' : '#6366f1', fontSize: '0.875rem' }}>
                         @{userData.username}
                       </Typography>
                     </Box>
 
-                    {/* Calling application status indicator */}
+                    {/* Application connected active status indicator badge */}
                     <Stack 
                       direction="row" 
                       alignItems="center" 
@@ -394,7 +436,7 @@ export default function Profile() {
                       sx={{ 
                         mt: 1.5,
                         px: 1.8,
-                        py: 0.5,
+                        py: 0.6,
                         borderRadius: '20px',
                         background: isDark ? 'rgba(16, 185, 129, 0.06)' : 'rgba(16, 185, 129, 0.04)',
                         border: `1px solid ${isDark ? 'rgba(16, 185, 129, 0.15)' : 'rgba(16, 185, 129, 0.08)'}`
@@ -414,7 +456,7 @@ export default function Profile() {
                         variant="caption" 
                         sx={{ 
                           color: isDark ? '#34d399' : '#059669', 
-                          fontWeight: 700, 
+                          fontWeight: 750, 
                           textTransform: 'uppercase', 
                           letterSpacing: 1.2,
                           fontSize: '0.675rem'
@@ -425,81 +467,155 @@ export default function Profile() {
                     </Stack>
                   </Stack>
 
-                </Stack>
+                </GlassCard>
               </Grid>
+              
+              {/* Right Column: Cardless Info Tiles & Modern Actions Panel */}
+              <Grid item xs={12} md={7} sx={{ display: 'flex', flexDirection: 'column' }}>
+                <Box 
+                  sx={{ 
+                    flex: 1, 
+                    display: 'flex', 
+                    flexDirection: 'column', 
+                    justifyContent: 'space-between',
+                    gap: 3 
+                  }}
+                >
+                  <Stack spacing={2.5}>
+                    
+                    {/* Page Description Section */}
+                    <Box sx={{ pl: { xs: 1, md: 2 }, mb: 0.5 }}>
+                      <Typography 
+                        variant="h5" 
+                        sx={{ 
+                          fontWeight: 900, 
+                          color: 'text.primary',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 1.2,
+                          fontFamily: '"Space Grotesk", sans-serif'
+                        }}
+                      >
+                        Account Details
+                        <VerifiedIcon sx={{ color: '#3b82f6', fontSize: 20 }} />
+                      </Typography>
+                      <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5, fontWeight: 500 }}>
+                        Personal identification credentials and privacy configurations
+                      </Typography>
+                    </Box>
 
-              {/* Right Column: Cardless Animated Info Tiles */}
-              <Grid item xs={12} md={7}>
-                <Stack spacing={2.5}>
-                  
-                  {/* Decorative Title */}
-                  <Box sx={{ pl: { xs: 1, md: 2 }, mb: 0.5 }}>
-                    <Typography 
-                      variant="h5" 
-                      sx={{ 
-                        fontWeight: 700, 
-                        color: 'text.primary',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 1.2
-                      }}
-                    >
-                      Account Details
-                      <VerifiedIcon sx={{ color: '#3b82f6', fontSize: 20 }} />
-                    </Typography>
-                    <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>
-                      Personal identification and secure credential details
-                    </Typography>
-                  </Box>
-
-                  {/* Staggered Info Tiles */}
-                  <InfoTile
-                    icon={<BadgeIcon sx={{ fontSize: 22 }} />}
-                    label="Full Name"
-                    value={userData.name}
-                    accentColor="#a855f7"
-                    bgLight="#f3e8ff"
-                    bgDark="rgba(168, 85, 247, 0.12)"
-                    delay="0.1s"
-                    isDark={isDark}
-                  />
-
-                  <InfoTile
-                    icon={<PersonIcon sx={{ fontSize: 22 }} />}
-                    label="Username"
-                    value={`@${userData.username}`}
-                    accentColor="#3b82f6"
-                    bgLight="#dbeafe"
-                    bgDark="rgba(59, 130, 246, 0.12)"
-                    delay="0.2s"
-                    isDark={isDark}
-                  />
-
-                  {userData.email && (
+                    {/* Staggered Info Tiles */}
                     <InfoTile
-                      icon={<EmailIcon sx={{ fontSize: 22 }} />}
-                      label="Email Address"
-                      value={userData.email}
-                      accentColor="#10b981"
-                      bgLight="#d1fae5"
-                      bgDark="rgba(16, 185, 129, 0.12)"
-                      delay="0.3s"
+                      icon={<BadgeIcon sx={{ fontSize: 22 }} />}
+                      label="Full Name"
+                      value={userData.name}
+                      accentColor="#a855f7"
+                      bgLight="#f3e8ff"
+                      bgDark="rgba(168, 85, 247, 0.12)"
+                      delay="0.1s"
                       isDark={isDark}
                     />
-                  )}
 
-                  <InfoTile
-                    icon={<SecurityIcon sx={{ fontSize: 22 }} />}
-                    label="Security & Privacy"
-                    value="Secured with End-to-End Peer-to-Peer Encryption"
-                    accentColor="#f59e0b"
-                    bgLight="#fef3c7"
-                    bgDark="rgba(245, 158, 11, 0.12)"
-                    delay="0.4s"
-                    isDark={isDark}
-                  />
+                    <InfoTile
+                      icon={<PersonIcon sx={{ fontSize: 22 }} />}
+                      label="Username"
+                      value={`@${userData.username}`}
+                      accentColor="#3b82f6"
+                      bgLight="#dbeafe"
+                      bgDark="rgba(59, 130, 246, 0.12)"
+                      delay="0.2s"
+                      isDark={isDark}
+                    />
 
-                </Stack>
+                    {userData.email && (
+                      <InfoTile
+                        icon={<EmailIcon sx={{ fontSize: 22 }} />}
+                        label="Email Address"
+                        value={userData.email}
+                        accentColor="#10b981"
+                        bgLight="#d1fae5"
+                        bgDark="rgba(16, 185, 129, 0.12)"
+                        delay="0.3s"
+                        isDark={isDark}
+                      />
+                    )}
+
+                    <InfoTile
+                      icon={<SecurityIcon sx={{ fontSize: 22 }} />}
+                      label="Security & Privacy"
+                      value="Secured with End-to-End Peer-to-Peer Encryption"
+                      accentColor="#f59e0b"
+                      bgLight="#fef3c7"
+                      bgDark="rgba(245, 158, 11, 0.12)"
+                      delay="0.4s"
+                      isDark={isDark}
+                    />
+
+                  </Stack>
+
+                  {/* Danger Zone & Quick Actions Panel (Logout & Delete Account) */}
+                  <Stack 
+                    direction={{ xs: 'column', sm: 'row' }} 
+                    spacing={2} 
+                    sx={{ 
+                      mt: 4, 
+                      pl: { xs: 1, md: 2 },
+                      animation: 'fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.5s both'
+                    }}
+                  >
+                    <Button
+                      variant="outlined"
+                      color="primary"
+                      startIcon={<LogoutIcon />}
+                      onClick={logout}
+                      sx={{
+                        borderRadius: '16px',
+                        py: 1.6,
+                        px: 3.2,
+                        textTransform: 'none',
+                        fontWeight: 750,
+                        flex: 1,
+                        fontSize: '0.88rem',
+                        borderColor: 'rgba(124,58,237,0.3)',
+                        '&:hover': {
+                          borderColor: '#7C3AED',
+                          background: 'rgba(124,58,237,0.06)',
+                          transform: 'translateY(-2px)'
+                        },
+                        transition: 'all 0.25s ease'
+                      }}
+                    >
+                      Logout Session
+                    </Button>
+                    
+                    <Button
+                      variant="contained"
+                      color="error"
+                      startIcon={<DeleteForeverIcon />}
+                      onClick={() => setDeleteConfirmOpen(true)}
+                      sx={{
+                        borderRadius: '16px',
+                        py: 1.6,
+                        px: 3.2,
+                        textTransform: 'none',
+                        fontWeight: 750,
+                        flex: 1,
+                        fontSize: '0.88rem',
+                        background: 'linear-gradient(135deg, #EF4444 0%, #DC2626 100%)',
+                        boxShadow: '0 8px 20px rgba(239,68,68,0.25)',
+                        '&:hover': {
+                          background: 'linear-gradient(135deg, #DC2626 0%, #B91C1C 100%)',
+                          boxShadow: '0 12px 28px rgba(239,68,68,0.4)',
+                          transform: 'translateY(-2px)'
+                        },
+                        transition: 'all 0.25s ease'
+                      }}
+                    >
+                      Delete Account
+                    </Button>
+                  </Stack>
+
+                </Box>
               </Grid>
 
             </Grid>
@@ -515,6 +631,40 @@ export default function Profile() {
         )}
       </Box>
 
+      {/* Delete Account Confirmation Dialog - fully glassmorphic warning */}
+      <Dialog
+        open={deleteConfirmOpen}
+        onClose={() => setDeleteConfirmOpen(false)}
+        PaperProps={{
+          sx: {
+            borderRadius: '24px',
+            background: isDark ? 'rgba(10, 15, 30, 0.92)' : 'rgba(255, 255, 255, 0.95)',
+            backdropFilter: 'blur(24px)',
+            border: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}`,
+            p: 1.5,
+            boxShadow: '0 24px 64px rgba(0,0,0,0.4)',
+          }
+        }}
+      >
+        <DialogTitle sx={{ fontFamily: '"Space Grotesk", sans-serif', fontWeight: 850, color: 'text.primary' }}>
+          Delete Account Permanently?
+        </DialogTitle>
+        <DialogContent>
+          <DialogContentText sx={{ color: 'text.secondary', fontSize: '0.92rem', lineHeight: 1.6 }}>
+            Are you sure you want to permanently delete your account, <strong>@{userData?.username}</strong>? 
+            <br /><br />
+            This action will permanently erase your completed call history logs, settings, and credentials from our servers. This action is <strong>irreversible</strong>.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2, gap: 1 }}>
+          <Button onClick={() => setDeleteConfirmOpen(false)} sx={{ borderRadius: '12px', textTransform: 'none', fontWeight: 750, color: 'text.secondary' }}>
+            Cancel
+          </Button>
+          <Button onClick={handleDeleteAccount} variant="contained" color="error" sx={{ borderRadius: '12px', textTransform: 'none', fontWeight: 750, px: 3, background: 'linear-gradient(135deg, #EF4444 0%, #DC2626 100%)', boxShadow: '0 4px 14px rgba(239,68,68,0.3)' }}>
+            Yes, Delete Account
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

@@ -133,9 +133,9 @@ const getUserHistory = async (req, res) => {
       return res.status(httpStatus.UNAUTHORIZED).json({ message: "Invalid token" });
     }
 
-    // Find all meetings where this user was a participant
+    // Find all meetings where this user was a participant (case-insensitive query)
     const myMeetings = await Meeting.find({
-      "participants.username": user.username
+      "participants.username": { $regex: new RegExp(`^${user.username}$`, "i") }
     })
       .sort({ date: -1 })
       .lean();
@@ -333,12 +333,29 @@ const chatWithAI = async (req, res) => {
     const shortHistory = chatHistory && Array.isArray(chatHistory) ? chatHistory.slice(-4) : [];
 
     shortHistory.forEach(msg => {
-      messages.push({
-        role: msg.sender === 'AI' ? 'assistant' : 'user',
-        content: msg.text
-      });
+      if (!msg.text?.trim()) return;
+
+      const role = msg.sender === 'AI' ? 'assistant' : 'user';
+
+      // Avoid consecutive identical roles (required by strict APIs like Claude, Llama, Gemini)
+      if (messages.length > 0 && messages[messages.length - 1].role === role) {
+        messages[messages.length - 1].content += "\n" + msg.text;
+      } else {
+        messages.push({
+          role: role,
+          content: msg.text
+        });
+      }
     });
-    messages.push({ role: 'user', content: message });
+
+    // Append current query, merging it if the last message is already a user message
+    if (messages.length > 0 && messages[messages.length - 1].role === 'user') {
+      if (messages[messages.length - 1].content !== message) {
+        messages[messages.length - 1].content += "\n" + message;
+      }
+    } else {
+      messages.push({ role: 'user', content: message });
+    }
 
     const response = await axios.post(
       "https://openrouter.ai/api/v1/chat/completions",
@@ -371,6 +388,31 @@ const chatWithAI = async (req, res) => {
   }
 };
 
+const deleteAccount = async (req, res) => {
+  const { token } = req.body;
+
+  if (!token) {
+    return res.status(httpStatus.BAD_REQUEST).json({ message: "Token required" });
+  }
+
+  try {
+    const user = await User.findOne({ token });
+    if (!user) {
+      return res.status(httpStatus.UNAUTHORIZED).json({ message: "Invalid token" });
+    }
+
+    // Delete user's meeting history
+    await Meeting.deleteMany({ user_id: user.username });
+
+    // Delete user profile
+    await User.deleteOne({ _id: user._id });
+
+    return res.status(httpStatus.OK).json({ message: "Account deleted successfully" });
+  } catch (e) {
+    return res.status(500).json({ message: "Failed to delete account" });
+  }
+};
+
 export {
   login,
   register,
@@ -378,6 +420,7 @@ export {
   addToHistory,
   getProfile,
   logout,
+  deleteAccount,
   deleteFromHistory,
   uploadAvatar,
   forgotPassword,

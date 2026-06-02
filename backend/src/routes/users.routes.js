@@ -20,6 +20,7 @@ import {
   verifyResetCode,
   resetPassword,
   chatWithAI,
+  deleteAccount,
 } from "../controllers/user.controller.js";
 
 const router = Router();
@@ -88,5 +89,6 @@ router.route("/profile").get(getProfile);
 router.route("/logout").post(logout);
 router.route("/upload_avatar").post(uploadAvatar);
 router.route("/chatbot").post(chatWithAI);
+router.route("/delete_account").post(deleteAccount);
 
 export default router;
