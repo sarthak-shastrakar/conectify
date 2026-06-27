@@ -360,11 +360,12 @@ const chatWithAI = async (req, res) => {
     const response = await axios.post(
       "https://openrouter.ai/api/v1/chat/completions",
       {
-        model: "openrouter/free",
+        // model: "openai/gpt-oss-120b:free",
+        model: "google/gemini-2.5-flash",
         messages: [
-          { 
-            role: "system", 
-            content: "You are Conectify Bot. Assist with video calls, general help, or tech issues. Be extremely brief; answer in 1-2 short sentences max. Reject NSFW/harmful." 
+          {
+            role: "system",
+            content: "You are Conectify Bot. Assist with video calls, general help, or tech issues. Be extremely brief; answer in 1-2 short sentences max. Reject NSFW/harmful."
           },
           ...messages
         ],
