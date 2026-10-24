@@ -14,6 +14,7 @@ import AIChat from './pages/AIChat';
 function App() {
   return (
     <AppThemeProvider>
+
       <Router>
         <AuthProvider>
           <Routes>

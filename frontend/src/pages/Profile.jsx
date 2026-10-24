@@ -146,7 +146,9 @@ export default function Profile() {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
   useEffect(() => { 
-    getProfile(); 
+    getProfile().catch((err) => {
+      console.warn("Could not refresh profile:", err?.message || err);
+    }); 
   }, []);
 
   const initials = userData?.name

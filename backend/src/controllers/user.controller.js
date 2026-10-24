@@ -107,6 +107,12 @@ const login = async (req, res) => {
       return res.status(httpStatus.UNAUTHORIZED).json({ message: GENERIC_ERROR });
     }
 
+    if (!user.password) {
+      return res.status(httpStatus.BAD_REQUEST).json({
+        message: "This account was registered using Google. Please click 'Continue with Google' or use 'Forgot password?' below to set a password for manual login.",
+      });
+    }
+
     const isPasswordCorrect = await bcrypt.compare(password, user.password);
     if (!isPasswordCorrect) {
       return res.status(httpStatus.UNAUTHORIZED).json({ message: GENERIC_ERROR });

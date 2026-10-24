@@ -1,28 +1,31 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../contexts/AuthContext';
 
 export default function GoogleCallback() {
   const navigate = useNavigate();
   const { handleTokenLogin } = React.useContext(AuthContext);
+  const handledRef = useRef(false);
 
   useEffect(() => {
+    if (handledRef.current) return;
+
     const params = new URLSearchParams(window.location.search);
     const token = params.get('token');
     const error = params.get('error');
 
     if (error || !token) {
-      navigate('/auth?error=google_failed');
+      navigate('/auth?error=google_failed', { replace: true });
       return;
     }
 
+    handledRef.current = true;
 
-
-    // Call the same auth context logic used for manual login
-    handleTokenLogin(token).catch(() => {
-      navigate('/auth?error=google_failed');
+    // Call the auth context logic to store token and fetch profile
+    handleTokenLogin(token).catch((err) => {
+      console.error('Google callback error:', err);
+      navigate('/auth?error=google_failed', { replace: true });
     });
-
   }, [navigate, handleTokenLogin]);
 
   // Show a loading spinner while processing

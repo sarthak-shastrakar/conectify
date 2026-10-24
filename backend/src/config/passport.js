@@ -29,22 +29,26 @@ export const configurePassport = () => {
       }
 
       // Case 3: Brand new user via Google
-      const username = email
-        ? email.split('@')[0] + '_' + Math.random().toString(36).slice(2, 6)
-        : 'user_' + Math.random().toString(36).slice(2, 8);
+      const cleanPrefix = (email ? email.split('@')[0] : 'user')
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, '')
+        .slice(0, 18);
+      const suffix = Math.random().toString(36).slice(2, 6);
+      const username = `${cleanPrefix || 'user'}_${suffix}`;
 
       const newUser = await User.create({
-        name: profile.displayName || username,
+        name: (profile.displayName || username).slice(0, 50),
         username,
         email,
         googleId: profile.id,
         avatar,
         authProvider: 'google',
-        password: null, // Note: Schema now allows optional password
+        password: null, // User can set manual password later via Forgot Password
       });
 
       return done(null, newUser);
     } catch (err) {
+      console.error("Google OAuth strategy error:", err);
       return done(err, null);
     }
   }));
