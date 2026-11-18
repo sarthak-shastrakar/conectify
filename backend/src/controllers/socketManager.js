@@ -7,10 +7,13 @@ let messages = {};      // roomPath → [{ sender, data, socket-id-sender }]
 let timeOnline = {};    // socketId → Date joined
 
 // Room metadata: who joined (by username), when room started having ≥2 people
-let roomMeta = {};      // roomPath → { startTime, usernames: [{ socketId, username, name, avatar }], hadMultiple: false }
+let roomMeta = {};      // roomPath → { startTime, users: [...], hadMultiple: false }
 
 // Map socketId → { username, name, avatar } for lookup on disconnect
 let socketUserMap = {}; // socketId → { username, name, avatar }
+
+// Helper: find which room a socket belongs to (O(1) with reverse map)
+let socketRoomMap = {}; // socketId → roomPath
 
 export const connectToSocket = (server) => {
     const io = new Server(server, {
@@ -19,7 +22,11 @@ export const connectToSocket = (server) => {
             methods: ["GET", "POST"],
             allowedHeaders: ["*"],
             credentials: true
-        }
+        },
+        // Force WebSocket transport to avoid polling overhead
+        transports: ["websocket"],
+        pingInterval: 25000,
+        pingTimeout: 60000,
     });
 
     io.on("connection", (socket) => {
@@ -27,29 +34,26 @@ export const connectToSocket = (server) => {
 
         // Client sends { path, username, name, avatar } on join
         socket.on("join-call", (path, userInfo) => {
-            if (connections[path] === undefined) {
+            if (!connections[path]) {
                 connections[path] = [];
             }
             connections[path].push(socket.id);
             timeOnline[socket.id] = new Date();
+            socketRoomMap[socket.id] = path;
 
             // Store user info mapped to socket
-            if (userInfo) {
-                socketUserMap[socket.id] = {
-                    username: userInfo.username || userInfo.name || "anonymous",
-                    name: userInfo.name || userInfo.username || "Anonymous",
-                    avatar: userInfo.avatar || null,
-                };
-            } else {
-                socketUserMap[socket.id] = { username: "anonymous", name: "Anonymous", avatar: null };
-            }
+            socketUserMap[socket.id] = {
+                username: userInfo?.username || userInfo?.name || "anonymous",
+                name: userInfo?.name || userInfo?.username || "Anonymous",
+                avatar: userInfo?.avatar || null,
+            };
 
             // Init room meta if first user
             if (!roomMeta[path]) {
                 roomMeta[path] = { startTime: null, users: [], hadMultiple: false };
             }
 
-            // Add user to room meta
+            // Add user to room meta (avoid duplicates)
             const u = socketUserMap[socket.id];
             if (!roomMeta[path].users.find(x => x.socketId === socket.id)) {
                 roomMeta[path].users.push({ socketId: socket.id, ...u });
@@ -62,204 +66,148 @@ export const connectToSocket = (server) => {
                 console.log(`Meeting started: ${path} at ${roomMeta[path].startTime}`);
             }
 
-            // Emit to all in room
-            const joiningUserName = socketUserMap[socket.id]?.name || socketUserMap[socket.id]?.username || "Someone";
-            for (let a = 0; a < connections[path].length; a++) {
-                io.to(connections[path][a]).emit("user-joined", socket.id, connections[path], joiningUserName);
-            }
+            // Emit to all in room (using socket.io room for efficiency)
+            const joiningUserName = socketUserMap[socket.id]?.name || "Someone";
 
-            // Send stored messages
-            if (messages[path] !== undefined) {
-                for (let a = 0; a < messages[path].length; ++a) {
-                    io.to(socket.id).emit(
-                        "chat-message",
-                        messages[path][a]["data"],
-                        messages[path][a]["sender"],
-                        messages[path][a]["socket-id-sender"]
-                    );
+            // Join socket.io room (enables efficient broadcast)
+            socket.join(path);
+
+            // Notify everyone in the room (including the new joiner)
+            io.to(path).emit("user-joined", socket.id, connections[path], joiningUserName);
+
+            // Send stored messages only to the new joiner
+            if (messages[path]) {
+                for (const msg of messages[path]) {
+                    socket.emit("chat-message", msg["data"], msg["sender"], msg["socket-id-sender"]);
                 }
             }
         });
 
+        // WebRTC signaling relay — simple point-to-point, no room needed
         socket.on("signal", (toId, message) => {
             io.to(toId).emit("signal", socket.id, message);
         });
 
         socket.on("chat-message", (data, sender) => {
-            const [matchingRoom, found] = Object.entries(connections).reduce(
-                ([room, isFound], [roomKey, roomValue]) => {
-                    if (!isFound && roomValue.includes(socket.id)) return [roomKey, true];
-                    return [room, isFound];
-                },
-                ["", false]
-            );
+            const path = socketRoomMap[socket.id];
+            if (!path) return;
 
-            if (found === true) {
-                if (messages[matchingRoom] === undefined) messages[matchingRoom] = [];
-                messages[matchingRoom].push({ sender, data, "socket-id-sender": socket.id });
-                console.log("message", matchingRoom, ":", sender, data);
-                connections[matchingRoom].forEach((elem) => {
-                    io.to(elem).emit("chat-message", data, sender, socket.id);
-                });
-            }
+            if (!messages[path]) messages[path] = [];
+            messages[path].push({ sender, data, "socket-id-sender": socket.id });
+
+            console.log("message", path, ":", sender, data);
+
+            // Broadcast to everyone in the room (including sender for confirmation)
+            io.to(path).emit("chat-message", data, sender, socket.id);
         });
 
         socket.on("edit-chat-message", (index, newData) => {
-            const [matchingRoom, found] = Object.entries(connections).reduce(
-                ([room, isFound], [roomKey, roomValue]) => {
-                    if (!isFound && roomValue.includes(socket.id)) return [roomKey, true];
-                    return [room, isFound];
-                },
-                ["", false]
-            );
+            const path = socketRoomMap[socket.id];
+            if (!path || !messages[path]) return;
 
-            if (found === true && messages[matchingRoom] !== undefined) {
-                const msg = messages[matchingRoom][index];
-                // Only allow editing if the message exists and was sent by this socket
-                if (msg && msg["socket-id-sender"] === socket.id) {
-                    msg.data = newData;
-                    console.log("message edited in", matchingRoom, "at index", index, ":", newData);
-                    connections[matchingRoom].forEach((elem) => {
-                        io.to(elem).emit("edit-chat-message", index, newData);
-                    });
-                }
+            const msg = messages[path][index];
+            if (msg && msg["socket-id-sender"] === socket.id) {
+                msg.data = newData;
+                console.log("message edited in", path, "at index", index, ":", newData);
+                io.to(path).emit("edit-chat-message", index, newData);
             }
         });
 
         socket.on("emoji-reaction", (emoji, sender) => {
-            const [matchingRoom, found] = Object.entries(connections).reduce(
-                ([room, isFound], [roomKey, roomValue]) => {
-                    if (!isFound && roomValue.includes(socket.id)) return [roomKey, true];
-                    return [room, isFound];
-                },
-                ["", false]
-            );
-            if (found) {
-                connections[matchingRoom].forEach((elem) => {
-                    io.to(elem).emit("emoji-reaction", emoji, sender, socket.id);
-                });
-            }
+            const path = socketRoomMap[socket.id];
+            if (!path) return;
+            io.to(path).emit("emoji-reaction", emoji, sender, socket.id);
         });
 
         socket.on("raise-hand", (sender) => {
-            const [matchingRoom, found] = Object.entries(connections).reduce(
-                ([room, isFound], [roomKey, roomValue]) => {
-                    if (!isFound && roomValue.includes(socket.id)) return [roomKey, true];
-                    return [room, isFound];
-                },
-                ["", false]
-            );
-            if (found) {
-                connections[matchingRoom].forEach((elem) => {
-                    io.to(elem).emit("raise-hand", socket.id, sender);
-                });
-            }
+            const path = socketRoomMap[socket.id];
+            if (!path) return;
+            io.to(path).emit("raise-hand", socket.id, sender);
         });
 
         socket.on("lower-hand", () => {
-            const [matchingRoom, found] = Object.entries(connections).reduce(
-                ([room, isFound], [roomKey, roomValue]) => {
-                    if (!isFound && roomValue.includes(socket.id)) return [roomKey, true];
-                    return [room, isFound];
-                },
-                ["", false]
-            );
-            if (found) {
-                connections[matchingRoom].forEach((elem) => {
-                    io.to(elem).emit("lower-hand", socket.id);
-                });
-            }
+            const path = socketRoomMap[socket.id];
+            if (!path) return;
+            io.to(path).emit("lower-hand", socket.id);
         });
 
         socket.on("disconnect", async () => {
-            let key;
+            const key = socketRoomMap[socket.id];
 
-            for (const [k, v] of JSON.parse(JSON.stringify(Object.entries(connections)))) {
-                for (let a = 0; a < v.length; ++a) {
-                    if (v[a] === socket.id) {
-                        key = k;
+            if (key && connections[key]) {
+                const leavingUserName = socketUserMap[socket.id]?.name || "Someone";
 
-                        // Notify everyone left
-                        const leavingUserName = socketUserMap[socket.id]?.name || socketUserMap[socket.id]?.username || "Someone";
-                        for (let a = 0; a < connections[key].length; ++a) {
-                            io.to(connections[key][a]).emit("user-left", socket.id, leavingUserName);
+                // Remove socket from room array
+                connections[key] = connections[key].filter(id => id !== socket.id);
+
+                // Notify all remaining participants
+                io.to(key).emit("user-left", socket.id, leavingUserName);
+
+                // ─── Room is now empty → save meeting to DB if valid ───────────
+                if (connections[key].length === 0) {
+                    delete connections[key];
+
+                    const meta = roomMeta[key];
+
+                    if (meta && meta.hadMultiple && meta.startTime) {
+                        const endTime = new Date();
+                        const durationSeconds = Math.round((endTime - meta.startTime) / 1000);
+
+                        const parts = key.split("/");
+                        const meetingCode = parts[parts.length - 1];
+
+                        const usernamesInRoom = [...new Set(meta.users.map(u => u.username))];
+
+                        const dbUsers = await User.find({ username: { $in: usernamesInRoom } })
+                            .select("name username avatar")
+                            .lean();
+
+                        const dbUserMap = {};
+                        dbUsers.forEach(u => { dbUserMap[u.username] = u; });
+
+                        const hostUsername = meta.users.length > 0 ? meta.users[0].username : null;
+
+                        const participantDocs = usernamesInRoom.map((uname) => {
+                            const dbUser = dbUserMap[uname];
+                            return {
+                                username: uname,
+                                name: dbUser?.name || uname,
+                                avatar: dbUser?.avatar || null,
+                                role: uname === hostUsername ? "Host" : "Participant"
+                            };
+                        });
+
+                        const meeting = new Meeting({
+                            user_id: hostUsername,
+                            meetingCode,
+                            date: meta.startTime,
+                            endedAt: endTime,
+                            duration: durationSeconds,
+                            participantCount: participantDocs.length,
+                            participants: participantDocs
+                        });
+
+                        try {
+                            await meeting.save();
+                            console.log(`Meeting saved: ${meetingCode}, duration: ${durationSeconds}s, participants: ${participantDocs.length}`);
+                        } catch (err) {
+                            console.error("Failed to save meeting:", err.message);
                         }
-
-                        // Remove socket from room
-                        const index = connections[key].indexOf(socket.id);
-                        connections[key].splice(index, 1);
-
-                        // ─── Room is now empty → save meeting to DB if valid ───────
-                        if (connections[key].length === 0) {
-                            delete connections[key];
-
-                            const meta = roomMeta[key];
-
-                            // Only save if at least 2 people joined at some point
-                            if (meta && meta.hadMultiple && meta.startTime) {
-                                const endTime = new Date();
-                                const durationSeconds = Math.round((endTime - meta.startTime) / 1000);
-
-                                // Extract meeting code from URL path (last segment)
-                                const parts = key.split("/");
-                                const meetingCode = parts[parts.length - 1];
-
-                                // Resolve participant data (username → name)
-                                const usernamesInRoom = [...new Set(meta.users.map(u => u.username))];
-                                
-                                // Find all users in DB
-                                const dbUsers = await User.find({ username: { $in: usernamesInRoom } })
-                                    .select("name username avatar")
-                                    .lean();
-
-                                const dbUserMap = {};
-                                dbUsers.forEach(u => { dbUserMap[u.username] = u; });
-
-                                // First user is host (joined first)
-                                const hostUsername = meta.users.length > 0 ? meta.users[0].username : null;
-
-                                const participantDocs = usernamesInRoom.map((uname, idx) => {
-                                    const dbUser = dbUserMap[uname];
-                                    return {
-                                        username: uname,
-                                        name: dbUser?.name || uname,
-                                        avatar: dbUser?.avatar || null,
-                                        role: uname === hostUsername ? "Host" : "Participant"
-                                    };
-                                });
-
-                                // Save one meeting record (host is user_id)
-                                const meeting = new Meeting({
-                                    user_id: hostUsername,
-                                    meetingCode,
-                                    date: meta.startTime,
-                                    endedAt: endTime,
-                                    duration: durationSeconds,
-                                    participantCount: participantDocs.length,
-                                    participants: participantDocs
-                                });
-
-                                try {
-                                    await meeting.save();
-                                    console.log(`Meeting saved: ${meetingCode}, duration: ${durationSeconds}s, participants: ${participantDocs.length}`);
-                                } catch (err) {
-                                    console.error("Failed to save meeting:", err.message);
-                                }
-                            } else {
-                                console.log(`Meeting ${key} NOT saved — only 1 person joined or no valid session.`);
-                            }
-
-                            // Cleanup meta
-                            delete roomMeta[key];
-                            delete messages[key];
-                        }
+                    } else {
+                        console.log(`Meeting ${key} NOT saved — only 1 person joined or no valid session.`);
                     }
+
+                    // Cleanup
+                    delete roomMeta[key];
+                    delete messages[key];
                 }
             }
 
-            // Clean up socket user map
+            // Clean up all maps for this socket
             delete socketUserMap[socket.id];
+            delete socketRoomMap[socket.id];
             delete timeOnline[socket.id];
+            console.log("Socket disconnected:", socket.id);
         });
     });
 
