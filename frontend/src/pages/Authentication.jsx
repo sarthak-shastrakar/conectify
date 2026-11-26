@@ -27,6 +27,7 @@ import GlassCard from '../components/ui/GlassCard';
 import GradientText from '../components/ui/GradientText';
 import ThemeToggle from '../components/ui/ThemeToggle';
 import OrbitalDecor from '../components/ui/OrbitalDecor';
+import server from '../environment';
 
 
 /** Computes password strength score 0–4 */
@@ -74,8 +75,8 @@ export default function Authentication() {
   }, []);
 
   const handleGoogleAuth = () => {
-    const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:8002';
-    window.location.href = `${apiUrl}/api/v1/users/auth/google`;
+
+    window.location.href = `${server}/api/v1/users/auth/google`;
   };
 
   const reset = () => { setUsername(''); setPassword(''); setName(''); setEmail(''); setError(''); };
@@ -113,16 +114,16 @@ export default function Authentication() {
   };
 
   const handleForgotAction = async () => {
-    const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:8002';
+
     setError('');
     try {
       setIsForgotSubmitting(true);
       if (forgotStep === 0) {
-        await axios.post(`${apiUrl}/api/v1/users/forgot-password`, { email: forgotEmail });
+        await axios.post(`${server}/api/v1/users/forgot-password`, { email: forgotEmail });
         setSuccessMsg('Email verified. Please set your new password.');
         setForgotStep(1);
       } else {
-        await axios.post(`${apiUrl}/api/v1/users/reset-password`, {
+        await axios.post(`${server}/api/v1/users/reset-password`, {
           email: forgotEmail,
           password: forgotNewPass,
         });
