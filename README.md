@@ -1,6 +1,3 @@
-<<<<<<< HEAD
-# conectify
-=======
 # Conectify: Video Conferencing Web App
 
 Conectify is a full-stack, highly secure real-time video conferencing web application built using the MERN (MongoDB, Express.js, React, Node.js) stack. The application enables users to create and join video meetings, chat in real-time, and share screens seamlessly.
@@ -8,7 +5,7 @@ Conectify is a full-stack, highly secure real-time video conferencing web applic
 ---
 
 ## 🚀 Live Demo
-You can try the live application here: **[Conectify Live Demo](https://conectify-call-frontend.onrender.com)**
+You can try the live application here: **[Conectify Live Demo](https://conectify-frontend.onrender.com/)**
 
 ---
 
