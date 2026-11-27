@@ -175,15 +175,16 @@ export default function Profile() {
       const base64 = event.target.result;
       try {
         setIsUploading(true);
-        await api.post("/upload_avatar", { 
+        const res = await api.post("/upload_avatar", {
           token: localStorage.getItem("token"), 
           avatar: base64 
-        });
-        setUserData((prev) => ({ ...prev, avatar: base64 }));
+        }, { timeout: 30000 });
+        setUserData((prev) => ({ ...prev, avatar: res.data?.avatar || base64 }));
       } catch (err) {
-        alert("Failed to upload avatar");
+        alert(err.response?.data?.message || "Failed to upload avatar");
       } finally {
         setIsUploading(false);
+        e.target.value = "";
       }
     };
     reader.readAsDataURL(file);

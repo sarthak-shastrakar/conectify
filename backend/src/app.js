@@ -80,6 +80,7 @@ const generalLimiter = rateLimit({
 });
 app.use(generalLimiter);
 
+app.use("/api/v1/users/upload_avatar", express.json({ limit: "10mb" }));
 app.use(express.json({ limit: "40kb" }));
 app.use(express.urlencoded({ limit: "40kb", extended: true }));
 
@@ -104,7 +105,8 @@ const start = async () => {
   }
 };
 
-// ─── Graceful shutdown — drain connections before exiting ─────────────────────
+
+// ─── Graceful shutdown — drain connections before exiting ──────────────────
 const shutdown = () => {
   console.log("Shutting down gracefully...");
   server.close(() => {
@@ -116,5 +118,4 @@ const shutdown = () => {
 };
 process.on("SIGTERM", shutdown);
 process.on("SIGINT", shutdown);
-
 start();

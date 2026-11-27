@@ -5,6 +5,7 @@ import crypto from "crypto";
 import axios from "axios";
 import { Meeting } from "../models/meeting.model.js";
 import { body, validationResult } from "express-validator";
+import cloudinary from "../config/cloudinary.js";
 
 // ─── Validation rule chains (used in routes) ─────────────────────────────────
 const registerValidation = [
@@ -246,7 +247,7 @@ const logout = async (req, res) => {
 const uploadAvatar = async (req, res) => {
   const { token, avatar } = req.body;
 
-  if (!avatar) {
+  if (!avatar || typeof avatar !== "string" || !avatar.startsWith("data:image/")) {
     return res.status(httpStatus.BAD_REQUEST).json({ message: "Avatar is required" });
   }
 
@@ -256,12 +257,23 @@ const uploadAvatar = async (req, res) => {
       return res.status(httpStatus.UNAUTHORIZED).json({ message: "Invalid token" });
     }
 
-    user.avatar = avatar;
+    const uploadResult = await cloudinary.uploader.upload(avatar, {
+      folder: "conectify/avatars",
+      public_id: `user_${user._id}`,
+      overwrite: true,
+      transformation: [
+        { width: 400, height: 400, crop: "fill", gravity: "face" },
+        { quality: "auto", fetch_format: "auto" },
+      ],
+    });
+
+    user.avatar = uploadResult.secure_url;
     await user.save();
 
-    return res.status(httpStatus.OK).json({ message: "Avatar updated successfully", avatar });
+    return res.status(httpStatus.OK).json({ message: "Avatar updated successfully", avatar: uploadResult.secure_url });
   } catch (e) {
-    return res.status(500).json({ message: "Failed to upload avatar" });
+    console.error("Cloudinary upload error:", e);
+    return res.status(500).json({ message: e?.message || "Failed to upload avatar" });
   }
 };
 
